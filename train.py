@@ -24,6 +24,7 @@ from shutil import copyfile
 from circle_loss import CircleLoss, convert_label_to_similarity
 from instance_loss import InstanceLoss
 import pandas as pd
+import tqdm
 
 version = torch.__version__
 # fp16
@@ -94,6 +95,8 @@ parser.add_argument('--FSGD', action='store_true',
                     help='use fused sgd, which will speed up trainig slightly. apex is needed.')
 parser.add_argument("--train_csv_path", default="", type=str)
 parser.add_argument("--val_csv_path", default="", type=str)
+parser.add_argument("--save_freq", default=1, type=int,
+                    help="frequency of saving the model in epochs")
 opt = parser.parse_args()
 
 fp16 = opt.fp16
@@ -147,13 +150,15 @@ if opt.PCB:
         transforms.Resize(size=(384, 192), interpolation=3),  # Image.BICUBIC
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ]
+    ]
 
-if opt.erasing_p>0:
-    transform_train_list = transform_train_list +  [RandomErasing(probability = opt.erasing_p, mean=[0.0, 0.0, 0.0])]
+if opt.erasing_p > 0:
+    transform_train_list = transform_train_list + \
+        [RandomErasing(probability=opt.erasing_p, mean=[0.0, 0.0, 0.0])]
 
 if opt.color_jitter:
-    transform_train_list = [transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0)] + transform_train_list
+    transform_train_list = [transforms.ColorJitter(
+        brightness=0.1, contrast=0.1, saturation=0.1, hue=0)] + transform_train_list
 
 print(transform_train_list)
 data_transforms = {
@@ -264,7 +269,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             running_loss = 0.0
             running_corrects = 0.0
             # Iterate over data.
-            for data in dataloaders[phase]:
+            for data in tqdm.tqdm(dataloaders[phase]):
                 # get the inputs
                 inputs, labels = data
                 now_batch_size,c,h,w = inputs.shape
@@ -278,8 +283,8 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 else:
                     inputs, labels = Variable(inputs), Variable(labels)
                 # if we use low precision, input also need to be fp16
-                #if fp16:
-                #    inputs = inputs.half()
+                if fp16:
+                    inputs = inputs.half()
  
                 # zero the parameter gradients
                 optimizer.zero_grad()
@@ -377,8 +382,8 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
 
                 if phase == 'train':
                     if fp16: # we use optimier to backward loss
-                        with amp.scale_loss(loss, optimizer) as scaled_loss:
-                            scaled_loss.backward()
+                        # with amp.scale_loss(loss, optimizer) as scaled_loss:
+                        loss.backward()
                     else:
                         loss.backward()
                     optimizer.step()
@@ -401,11 +406,11 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             # deep copy the model
             if phase == 'val':
                 last_model_wts = model.state_dict()
-                if epoch%10 == 9:
+                if epoch % (opt.save_freq) == (opt.save_freq - 1):
                     save_network(model, epoch)
                 draw_curve(epoch)
             if phase == 'train':
-               scheduler.step()
+                scheduler.step()
         time_elapsed = time.time() - since
         print('Training complete in {:.0f}m {:.0f}s'.format(
             time_elapsed // 60, time_elapsed % 60))
@@ -540,7 +545,8 @@ criterion = nn.CrossEntropyLoss()
 if fp16:
     #model = network_to_half(model)
     #optimizer_ft = FP16_Optimizer(optimizer_ft, static_loss_scale = 128.0)
-    model, optimizer_ft = amp.initialize(model, optimizer_ft, opt_level = "O1")
+    # model, optimizer_ft = amp.initialize(model, optimizer_ft, opt_level = "O1")
+    model = model.half()
 
 model = train_model(model, criterion, optimizer_ft, exp_lr_scheduler,
                        num_epochs=opt.total_epoch)
