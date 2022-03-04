@@ -23,55 +23,77 @@ import yaml
 from shutil import copyfile
 from circle_loss import CircleLoss, convert_label_to_similarity
 from instance_loss import InstanceLoss
+import pandas as pd
 
-version =  torch.__version__
-#fp16
+version = torch.__version__
+# fp16
 try:
     from apex.fp16_utils import *
     from apex import amp
     from apex.optimizers import FusedSGD
-except ImportError: # will be 3.x series
+except ImportError:  # will be 3.x series
     print('This is not an error. If you want to use low precision, i.e., fp16, please install the apex with cuda support (https://github.com/NVIDIA/apex) and update pytorch to 1.0')
 
-from pytorch_metric_learning import losses, miners #pip install pytorch-metric-learning
+# pip install pytorch-metric-learning
+from pytorch_metric_learning import losses, miners
+from tools.dataset import ImageDataset
 
 ######################################################################
 # Options
 # --------
 parser = argparse.ArgumentParser(description='Training')
-parser.add_argument('--gpu_ids',default='0', type=str,help='gpu_ids: e.g. 0  0,1,2  0,2')
-parser.add_argument('--name',default='ft_ResNet50', type=str, help='output model name')
-parser.add_argument('--data_dir',default='../Market/pytorch',type=str, help='training dir path')
-parser.add_argument('--train_all', action='store_true', help='use all training data' )
-parser.add_argument('--color_jitter', action='store_true', help='use color jitter in training' )
+parser.add_argument('--gpu_ids', default='0', type=str,
+                    help='gpu_ids: e.g. 0  0,1,2  0,2')
+parser.add_argument('--name', default='ft_ResNet50',
+                    type=str, help='output model name')
+parser.add_argument('--data_dir', default='../Market/pytorch',
+                    type=str, help='training dir path')
+parser.add_argument('--train_all', action='store_true',
+                    help='use all training data')
+parser.add_argument('--color_jitter', action='store_true',
+                    help='use color jitter in training')
 parser.add_argument('--batchsize', default=32, type=int, help='batchsize')
-parser.add_argument('--linear_num', default=512, type=int, help='feature dimension: 512 or default or 0 (linear=False)')
+parser.add_argument('--linear_num', default=512, type=int,
+                    help='feature dimension: 512 or default or 0 (linear=False)')
 parser.add_argument('--stride', default=2, type=int, help='stride')
-parser.add_argument('--erasing_p', default=0, type=float, help='Random Erasing probability, in [0,1]')
-parser.add_argument('--use_dense', action='store_true', help='use densenet121' )
-parser.add_argument('--use_swin', action='store_true', help='use swin transformer 224x224' )
-parser.add_argument('--use_efficient', action='store_true', help='use efficientnet-b4' )
-parser.add_argument('--use_NAS', action='store_true', help='use NAS' )
-parser.add_argument('--use_hr', action='store_true', help='use NAS' )
-parser.add_argument('--warm_epoch', default=0, type=int, help='the first K epoch that needs warm up')
-parser.add_argument('--total_epoch', default=60, type=int, help='total training epoch')
+parser.add_argument('--erasing_p', default=0, type=float,
+                    help='Random Erasing probability, in [0,1]')
+parser.add_argument('--use_dense', action='store_true', help='use densenet121')
+parser.add_argument('--use_swin', action='store_true',
+                    help='use swin transformer 224x224')
+parser.add_argument('--use_efficient', action='store_true',
+                    help='use efficientnet-b4')
+parser.add_argument('--use_NAS', action='store_true', help='use NAS')
+parser.add_argument('--use_hr', action='store_true', help='use NAS')
+parser.add_argument('--warm_epoch', default=0, type=int,
+                    help='the first K epoch that needs warm up')
+parser.add_argument('--total_epoch', default=60,
+                    type=int, help='total training epoch')
 parser.add_argument('--lr', default=0.05, type=float, help='learning rate')
 parser.add_argument('--droprate', default=0.5, type=float, help='drop rate')
-parser.add_argument('--PCB', action='store_true', help='use PCB+ResNet50' )
-parser.add_argument('--arcface', action='store_true', help='use ArcFace loss' )
-parser.add_argument('--circle', action='store_true', help='use Circle loss' )
-parser.add_argument('--cosface', action='store_true', help='use CosFace loss' )
-parser.add_argument('--contrast', action='store_true', help='use contrast loss' )
-parser.add_argument('--instance', action='store_true', help='use instance loss' )
-parser.add_argument('--ins_gamma', default=32, type=int, help='gamma for instance loss')
-parser.add_argument('--triplet', action='store_true', help='use triplet loss' )
-parser.add_argument('--lifted', action='store_true', help='use lifted loss' )
-parser.add_argument('--sphere', action='store_true', help='use sphere loss' )
-parser.add_argument('--ibn', action='store_true', help='use resnet+ibn' )
-parser.add_argument('--DG', action='store_true', help='use extra DG-Market Dataset for training. Please download it from https://github.com/NVlabs/DG-Net#dg-market.' )
-parser.add_argument('--fp16', action='store_true', help='use float16 instead of float32, which will save about 50% memory' )
-parser.add_argument('--cosine', action='store_true', help='use cosine lrRate' )
-parser.add_argument('--FSGD', action='store_true', help='use fused sgd, which will speed up trainig slightly. apex is needed.' )
+parser.add_argument('--PCB', action='store_true', help='use PCB+ResNet50')
+parser.add_argument('--arcface', action='store_true', help='use ArcFace loss')
+parser.add_argument('--circle', action='store_true', help='use Circle loss')
+parser.add_argument('--cosface', action='store_true', help='use CosFace loss')
+parser.add_argument('--contrast', action='store_true',
+                    help='use contrast loss')
+parser.add_argument('--instance', action='store_true',
+                    help='use instance loss')
+parser.add_argument('--ins_gamma', default=32, type=int,
+                    help='gamma for instance loss')
+parser.add_argument('--triplet', action='store_true', help='use triplet loss')
+parser.add_argument('--lifted', action='store_true', help='use lifted loss')
+parser.add_argument('--sphere', action='store_true', help='use sphere loss')
+parser.add_argument('--ibn', action='store_true', help='use resnet+ibn')
+parser.add_argument('--DG', action='store_true',
+                    help='use extra DG-Market Dataset for training. Please download it from https://github.com/NVlabs/DG-Net#dg-market.')
+parser.add_argument('--fp16', action='store_true',
+                    help='use float16 instead of float32, which will save about 50 memory')
+parser.add_argument('--cosine', action='store_true', help='use cosine lrRate')
+parser.add_argument('--FSGD', action='store_true',
+                    help='use fused sgd, which will speed up trainig slightly. apex is needed.')
+parser.add_argument("--train_csv_path", default="", type=str)
+parser.add_argument("--val_csv_path", default="", type=str)
 opt = parser.parse_args()
 
 fp16 = opt.fp16
@@ -81,11 +103,11 @@ str_ids = opt.gpu_ids.split(',')
 gpu_ids = []
 for str_id in str_ids:
     gid = int(str_id)
-    if gid >=0:
+    if gid >= 0:
         gpu_ids.append(gid)
 
 # set gpu ids
-if len(gpu_ids)>0:
+if len(gpu_ids) > 0:
     torch.cuda.set_device(gpu_ids[0])
     cudnn.benchmark = True
 ######################################################################
@@ -99,30 +121,30 @@ else:
     h, w = 256, 128
 
 transform_train_list = [
-        #transforms.RandomResizedCrop(size=128, scale=(0.75,1.0), ratio=(0.75,1.3333), interpolation=3), #Image.BICUBIC)
-        transforms.Resize((h, w), interpolation=3),
-        transforms.Pad(10),
-        transforms.RandomCrop((h, w)),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ]
+    # transforms.RandomResizedCrop(size=128, scale=(0.75,1.0), ratio=(0.75,1.3333), interpolation=3), #Image.BICUBIC)
+    transforms.Resize((h, w), interpolation=3),
+    transforms.Pad(10),
+    transforms.RandomCrop((h, w)),
+    transforms.RandomHorizontalFlip(),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+]
 
 transform_val_list = [
-        transforms.Resize(size=(h, w),interpolation=3), #Image.BICUBIC
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ]
+    transforms.Resize(size=(h, w), interpolation=3),  # Image.BICUBIC
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+]
 
 if opt.PCB:
     transform_train_list = [
-        transforms.Resize((384,192), interpolation=3),
+        transforms.Resize((384, 192), interpolation=3),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ]
+    ]
     transform_val_list = [
-        transforms.Resize(size=(384,192),interpolation=3), #Image.BICUBIC
+        transforms.Resize(size=(384, 192), interpolation=3),  # Image.BICUBIC
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ]
@@ -145,14 +167,22 @@ if opt.train_all:
      train_all = '_all'
 
 image_datasets = {}
-image_datasets['train'] = datasets.ImageFolder(os.path.join(data_dir, 'train' + train_all),
+if not opt.train_csv_path:
+    image_datasets['train'] = datasets.ImageFolder(os.path.join(data_dir, 'train' + train_all),
                                           data_transforms['train'])
-image_datasets['val'] = datasets.ImageFolder(os.path.join(data_dir, 'val'),
+    image_datasets['val'] = datasets.ImageFolder(os.path.join(data_dir, 'val'),
                                           data_transforms['val'])
+else:
+    train_df = pd.read_csv(opt.train_csv_path)
+    val_df = pd.read_csv(opt.val_csv_path)
+    image_datasets["train"] = ImageDataset(opt.data_dir, train_df, "id", transform=data_transforms["train"])
+    image_datasets["val"] = ImageDataset(opt.data_dir, val_df, "id", transform=data_transforms["val"])
+    
 
+# 8 workers may work faster
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=opt.batchsize,
-                                             shuffle=True, num_workers=2, pin_memory=True) # 8 workers may work faster
-              for x in ['train', 'val']}
+                                             shuffle=True, num_workers=2, pin_memory=True) 
+               for x in ['train', 'val']}
 
 # Use extra DG-Market Dataset for training. Please download it from https://github.com/NVlabs/DG-Net#dg-market.
 if opt.DG:

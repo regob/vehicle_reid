@@ -3,21 +3,24 @@ import torch.nn as nn
 from torch.nn import init
 from torchvision import models
 from torch.autograd import Variable
-import pretrainedmodels
 import timm
 
 ######################################################################
+
+
 def weights_init_kaiming(m):
     classname = m.__class__.__name__
     # print(classname)
     if classname.find('Conv') != -1:
-        init.kaiming_normal_(m.weight.data, a=0, mode='fan_in') # For old pytorch, you may use kaiming_normal.
+        # For old pytorch, you may use kaiming_normal.
+        init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')
     elif classname.find('Linear') != -1:
         init.kaiming_normal_(m.weight.data, a=0, mode='fan_out')
     elif classname.find('BatchNorm1d') != -1:
         init.normal_(m.weight.data, 1.0, 0.02)
     if hasattr(m, 'bias') and m.bias is not None:
         init.constant_(m.bias.data, 0.0)
+
 
 def weights_init_classifier(m):
     classname = m.__class__.__name__
@@ -27,6 +30,8 @@ def weights_init_classifier(m):
 
 # Defines the new fc layer and classification layer
 # |--Linear--|--bn--|--relu--|--Linear--|
+
+
 class ClassBlock(nn.Module):
     def __init__(self, input_dim, class_num, droprate, relu=False, bnorm=True, linear=512, return_f = False):
         super(ClassBlock, self).__init__()
@@ -191,6 +196,7 @@ class ft_net_NAS(nn.Module):
         super().__init__()  
         model_name = 'nasnetalarge' 
         # pip install pretrainedmodels
+        import pretrainedmodels
         model_ft = pretrainedmodels.__dict__[model_name](num_classes=1000, pretrained='imagenet')
         model_ft.avg_pool = nn.AdaptiveAvgPool2d((1,1))
         model_ft.dropout = nn.Sequential()
