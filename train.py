@@ -97,6 +97,8 @@ parser.add_argument("--train_csv_path", default="", type=str)
 parser.add_argument("--val_csv_path", default="", type=str)
 parser.add_argument("--save_freq", default=1, type=int,
                     help="frequency of saving the model in epochs")
+parser.add_argument("--saved_model", default="", type=str,
+                    help="Model to load.")
 opt = parser.parse_args()
 
 fp16 = opt.fp16
@@ -162,27 +164,29 @@ if opt.color_jitter:
 
 print(transform_train_list)
 data_transforms = {
-    'train': transforms.Compose( transform_train_list ),
+    'train': transforms.Compose(transform_train_list),
     'val': transforms.Compose(transform_val_list),
 }
 
 
 train_all = ''
 if opt.train_all:
-     train_all = '_all'
+    train_all = '_all'
 
 image_datasets = {}
 if not opt.train_csv_path:
     image_datasets['train'] = datasets.ImageFolder(os.path.join(data_dir, 'train' + train_all),
-                                          data_transforms['train'])
+                                                   data_transforms['train'])
     image_datasets['val'] = datasets.ImageFolder(os.path.join(data_dir, 'val'),
-                                          data_transforms['val'])
+                                                 data_transforms['val'])
 else:
     train_df = pd.read_csv(opt.train_csv_path)
     val_df = pd.read_csv(opt.val_csv_path)
-    image_datasets["train"] = ImageDataset(opt.data_dir, train_df, "id", transform=data_transforms["train"])
-    image_datasets["val"] = ImageDataset(opt.data_dir, val_df, "id", transform=data_transforms["val"])
-    
+    image_datasets["train"] = ImageDataset(
+        opt.data_dir, train_df, "id", transform=data_transforms["train"])
+    image_datasets["val"] = ImageDataset(
+        opt.data_dir, val_df, "id", transform=data_transforms["val"])
+
 
 # 8 workers may work faster
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=opt.batchsize,
@@ -487,13 +491,15 @@ print(model)
 
 # model to gpu
 model = model.cuda()
+if fp16:
+    model = model.half()
 
 optim_name = optim.SGD #apex.optimizers.FusedSGD
 if opt.FSGD: # apex is needed
     optim_name = FusedSGD
 
 if not opt.PCB:
-    ignored_params = list(map(id, model.classifier.parameters() ))
+    ignored_params = list(map(id, model.classifier.parameters()))
     base_params = filter(lambda p: id(p) not in ignored_params, model.parameters())
     classifier_params = model.classifier.parameters()
     optimizer_ft = optim_name([
@@ -541,12 +547,6 @@ with open('%s/opts.yaml'%dir_name,'w') as fp:
     yaml.dump(vars(opt), fp, default_flow_style=False)
 
 criterion = nn.CrossEntropyLoss()
-
-if fp16:
-    #model = network_to_half(model)
-    #optimizer_ft = FP16_Optimizer(optimizer_ft, static_loss_scale = 128.0)
-    # model, optimizer_ft = amp.initialize(model, optimizer_ft, opt_level = "O1")
-    model = model.half()
 
 model = train_model(model, criterion, optimizer_ft, exp_lr_scheduler,
                        num_epochs=opt.total_epoch)
