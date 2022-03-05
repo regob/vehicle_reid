@@ -27,13 +27,6 @@ import pandas as pd
 import tqdm
 
 version = torch.__version__
-# fp16
-try:
-    from apex.fp16_utils import *
-    from apex import amp
-    from apex.optimizers import FusedSGD
-except ImportError:  # will be 3.x series
-    print('This is not an error. If you want to use low precision, i.e., fp16, please install the apex with cuda support (https://github.com/NVIDIA/apex) and update pytorch to 1.0')
 
 # pip install pytorch-metric-learning
 from pytorch_metric_learning import losses, miners
@@ -97,8 +90,10 @@ parser.add_argument("--train_csv_path", default="", type=str)
 parser.add_argument("--val_csv_path", default="", type=str)
 parser.add_argument("--save_freq", default=1, type=int,
                     help="frequency of saving the model in epochs")
-parser.add_argument("--saved_model", default="", type=str,
-                    help="Model to load.")
+parser.add_argument("--checkpoint", default="", type=str,
+                    help="Model checkpoint to load.")
+parser.add_argument("--start_epoch", default=0, type=int,
+                    help="Epoch to continue training from.")
 opt = parser.parse_args()
 
 fp16 = opt.fp16
@@ -190,15 +185,15 @@ else:
 
 # 8 workers may work faster
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=opt.batchsize,
-                                             shuffle=True, num_workers=2, pin_memory=True) 
+                                              shuffle=True, num_workers=2, pin_memory=True)
                for x in ['train', 'val']}
 
 # Use extra DG-Market Dataset for training. Please download it from https://github.com/NVlabs/DG-Net#dg-market.
 if opt.DG:
-    image_datasets['DG'] = DGFolder(os.path.join('../DG-Market' ),
-                                          data_transforms['train'])
-    dataloaders['DG'] = torch.utils.data.DataLoader(image_datasets['DG'], batch_size = max(8, opt.batchsize//2),
-                                             shuffle=True, num_workers=2, pin_memory=True)
+    image_datasets['DG'] = DGFolder(os.path.join('../DG-Market'),
+                                    data_transforms['train'])
+    dataloaders['DG'] = torch.utils.data.DataLoader(image_datasets['DG'], batch_size=max(8, opt.batchsize // 2),
+                                                    shuffle=True, num_workers=2, pin_memory=True)
     DGloader_iter = enumerate(dataloaders['DG'])
 
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
@@ -208,7 +203,7 @@ use_gpu = torch.cuda.is_available()
 
 since = time.time()
 inputs, classes = next(iter(dataloaders['train']))
-print(time.time()-since)
+print(time.time() - since)
 ######################################################################
 # Training the model
 # ------------------
@@ -222,26 +217,30 @@ print(time.time()-since)
 # In the following, parameter ``scheduler`` is an LR scheduler object from
 # ``torch.optim.lr_scheduler``.
 
-y_loss = {} # loss history
+y_loss = {}  # loss history
 y_loss['train'] = []
 y_loss['val'] = []
 y_err = {}
 y_err['train'] = []
 y_err['val'] = []
 
+
 def fliplr(img):
     '''flip horizontal'''
-    inv_idx = torch.arange(img.size(3)-1,-1,-1).long().cuda()  # N x C x H x W
-    img_flip = img.index_select(3,inv_idx)
+    inv_idx = torch.arange(img.size(3) - 1, -1, -
+                           1).long().cuda()  # N x C x H x W
+    img_flip = img.index_select(3, inv_idx)
     return img_flip
 
-def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
+
+def train_model(model, criterion, optimizer, scheduler, start_epoch=0, num_epochs=25):
     since = time.time()
 
     #best_model_wts = model.state_dict()
     #best_acc = 0.0
-    warm_up = 0.1 # We start from the 0.1*lrRate
-    warm_iteration = round(dataset_sizes['train']/opt.batchsize)*opt.warm_epoch # first 5 epoch
+    warm_up = 0.1  # We start from the 0.1*lrRate
+    warm_iteration = round(
+        dataset_sizes['train'] / opt.batchsize) * opt.warm_epoch
     if opt.arcface:
         criterion_arcface = losses.ArcFaceLoss(num_classes=opt.nclasses, embedding_size=512)
     if opt.cosface: 
@@ -259,7 +258,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
         criterion_instance = InstanceLoss(gamma = opt.ins_gamma)
     if opt.sphere:
         criterion_sphere = losses.SphereFaceLoss(num_classes=opt.nclasses, embedding_size=512, margin=4)
-    for epoch in range(num_epochs):
+    for epoch in range(start_epoch, num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
         
@@ -453,11 +452,16 @@ def draw_curve(current_epoch):
 # Save model
 #---------------------------
 def save_network(network, epoch_label):
-    save_filename = 'net_%s.pth'% epoch_label
-    save_path = os.path.join('./model',name,save_filename)
+    save_filename = 'net_%s.pth' % epoch_label
+    save_path = os.path.join('./model', name, save_filename)
     torch.save(network.cpu().state_dict(), save_path)
     if torch.cuda.is_available():
         network.cuda(gpu_ids[0])
+
+def load_network(network, path):
+    sdict = torch.load(path)
+    network.load_state_dict(sdict)
+    return network
 
 
 ######################################################################
@@ -488,6 +492,9 @@ if opt.PCB:
 opt.nclasses = len(class_names)
 
 print(model)
+
+if opt.checkpoint:
+    model = load_network(model, opt.checkpoint)
 
 # model to gpu
 model = model.cuda()
@@ -549,5 +556,5 @@ with open('%s/opts.yaml'%dir_name,'w') as fp:
 criterion = nn.CrossEntropyLoss()
 
 model = train_model(model, criterion, optimizer_ft, exp_lr_scheduler,
-                       num_epochs=opt.total_epoch)
+                       start_epoch=opt.start_epoch, num_epochs=opt.total_epoch)
 
