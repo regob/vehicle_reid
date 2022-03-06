@@ -322,41 +322,43 @@ def train_model(model, criterion, optimizer, scheduler, start_epoch=0, num_epoch
                         # /now_batch_size
                         loss += criterion_triplet(ff, labels, hard_pairs)
                     if opt.lifted:
-                        loss +=  criterion_lifted(ff, labels) #/now_batch_size
+                        loss += criterion_lifted(ff, labels)  # /now_batch_size
                     if opt.contrast:
-                        loss +=  criterion_contrast(ff, labels) #/now_batch_size
+                        # /now_batch_size
+                        loss += criterion_contrast(ff, labels)
                     if opt.instance:
-                        loss += criterion_instance(ff, labels) /now_batch_size
+                        loss += criterion_instance(ff, labels) / now_batch_size
                     if opt.sphere:
-                        loss +=  criterion_sphere(ff, labels)/now_batch_size
-                elif opt.PCB:  #  PCB
+                        loss += criterion_sphere(ff, labels) / now_batch_size
+                elif opt.PCB:  # PCB
                     part = {}
                     num_part = 6
                     for i in range(num_part):
                         part[i] = outputs[i]
 
-                    score = sm(part[0]) + sm(part[1]) +sm(part[2]) + sm(part[3]) +sm(part[4]) +sm(part[5])
+                    score = sm(part[0]) + sm(part[1]) + sm(part[2]) + \
+                        sm(part[3]) + sm(part[4]) + sm(part[5])
                     _, preds = torch.max(score.data, 1)
 
                     loss = criterion(part[0], labels)
-                    for i in range(num_part-1):
-                        loss += criterion(part[i+1], labels)
-                else:  #  norm
+                    for i in range(num_part - 1):
+                        loss += criterion(part[i + 1], labels)
+                else:  # norm
                     _, preds = torch.max(outputs.data, 1)
                     loss = criterion(outputs, labels)
 
                 del inputs
                 # use extra DG Dataset (https://github.com/NVlabs/DG-Net#dg-market)
-                if opt.DG and phase == 'train' and epoch > num_epochs*0.1:
+                if opt.DG and phase == 'train' and epoch > num_epochs * 0.1:
                     try:
                         _, batch = DGloader_iter.__next__()
-                    except StopIteration: 
+                    except StopIteration:
                         DGloader_iter = enumerate(dataloaders['DG'])
                         _, batch = DGloader_iter.__next__()
                     except UnboundLocalError:  # first iteration
                         DGloader_iter = enumerate(dataloaders['DG'])
                         _, batch = DGloader_iter.__next__()
-                        
+
                     inputs1, inputs2, _ = batch
                     inputs1 = inputs1.cuda().detach()
                     inputs2 = inputs2.cuda().detach()
@@ -367,49 +369,53 @@ def train_model(model, criterion, optimizer, scheduler, start_epoch=0, num_epoch
                     elif opt.PCB:
                         for i in range(num_part):
                             part[i] = outputs1[i]
-                        outputs1 = part[0] + part[1] + part[2] + part[3] + part[4] + part[5]
+                        outputs1 = part[0] + part[1] + \
+                            part[2] + part[3] + part[4] + part[5]
                     outputs2 = model(inputs2)
                     if return_feature:
                         outputs2, _ = outputs2
                     elif opt.PCB:
                         for i in range(num_part):
                             part[i] = outputs2[i]
-                        outputs2 = part[0] + part[1] + part[2] + part[3] + part[4] + part[5]
+                        outputs2 = part[0] + part[1] + \
+                            part[2] + part[3] + part[4] + part[5]
 
                     mean_pred = sm(outputs1 + outputs2)
                     kl_loss = nn.KLDivLoss(size_average=False)
-                    reg= (kl_loss(log_sm(outputs2) , mean_pred)  + kl_loss(log_sm(outputs1) , mean_pred))/2
-                    loss += 0.01*reg
+                    reg = (kl_loss(log_sm(outputs2), mean_pred) +
+                           kl_loss(log_sm(outputs1), mean_pred)) / 2
+                    loss += 0.01 * reg
                     del inputs1, inputs2
-                    #print(0.01*reg)
+                    # print(0.01*reg)
                 # backward + optimize only if in training phase
-                if epoch<opt.warm_epoch and phase == 'train': 
+                if epoch < opt.warm_epoch and phase == 'train':
                     warm_up = min(1.0, warm_up + 0.9 / warm_iteration)
-                    loss = loss*warm_up
+                    loss = loss * warm_up
 
                 if phase == 'train':
-                    if fp16: # we use optimier to backward loss
+                    if fp16:  # we use optimier to backward loss
                         # with amp.scale_loss(loss, optimizer) as scaled_loss:
                         loss.backward()
                     else:
                         loss.backward()
                     optimizer.step()
                 # statistics
-                if int(version[0])>0 or int(version[2]) > 3: # for the new version like 0.4.0, 0.5.0 and 1.0.0
+                # for the new version like 0.4.0, 0.5.0 and 1.0.0
+                if int(version[0]) > 0 or int(version[2]) > 3:
                     running_loss += loss.item() * now_batch_size
-                else :  # for the old version like 0.3.0 and 0.3.1
+                else:  # for the old version like 0.3.0 and 0.3.1
                     running_loss += loss.data[0] * now_batch_size
                 del loss
                 running_corrects += float(torch.sum(preds == labels.data))
 
             epoch_loss = running_loss / dataset_sizes[phase]
             epoch_acc = running_corrects / dataset_sizes[phase]
-            
+
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(
                 phase, epoch_loss, epoch_acc))
-            
+
             y_loss[phase].append(epoch_loss)
-            y_err[phase].append(1.0-epoch_acc)            
+            y_err[phase].append(1.0 - epoch_acc)
             # deep copy the model
             if phase == 'val':
                 last_model_wts = model.state_dict()
@@ -436,11 +442,13 @@ def train_model(model, criterion, optimizer, scheduler, start_epoch=0, num_epoch
 
 ######################################################################
 # Draw Curve
-#---------------------------
+# ---------------------------
 x_epoch = []
 fig = plt.figure()
 ax0 = fig.add_subplot(121, title="loss")
 ax1 = fig.add_subplot(122, title="top1err")
+
+
 def draw_curve(current_epoch):
     x_epoch.append(current_epoch)
     ax0.plot(x_epoch, y_loss['train'], 'bo-', label='train')
@@ -450,17 +458,20 @@ def draw_curve(current_epoch):
     if current_epoch == 0:
         ax0.legend()
         ax1.legend()
-    fig.savefig( os.path.join('./model',name,'train.jpg'))
+    fig.savefig(os.path.join('./model', name, 'train.jpg'))
 
 ######################################################################
 # Save model
-#---------------------------
+# ---------------------------
+
+
 def save_network(network, epoch_label):
     save_filename = 'net_%s.pth' % epoch_label
     save_path = os.path.join('./model', name, save_filename)
     torch.save(network.cpu().state_dict(), save_path)
     if torch.cuda.is_available():
         network.cuda(gpu_ids[0])
+
 
 def load_network(network, path):
     sdict = torch.load(path)
@@ -478,17 +489,23 @@ def load_network(network, path):
 return_feature = opt.arcface or opt.cosface or opt.circle or opt.triplet or opt.contrast or opt.instance or opt.lifted or opt.sphere
 
 if opt.use_dense:
-    model = ft_net_dense(len(class_names), opt.droprate, circle = return_feature, linear_num=opt.linear_num)
+    model = ft_net_dense(len(class_names), opt.droprate,
+                         circle=return_feature, linear_num=opt.linear_num)
 elif opt.use_NAS:
-    model = ft_net_NAS(len(class_names), opt.droprate, linear_num=opt.linear_num)
+    model = ft_net_NAS(len(class_names), opt.droprate,
+                       linear_num=opt.linear_num)
 elif opt.use_swin:
-    model = ft_net_swin(len(class_names), opt.droprate, opt.stride, circle = return_feature, linear_num=opt.linear_num)
+    model = ft_net_swin(len(class_names), opt.droprate, opt.stride,
+                        circle=return_feature, linear_num=opt.linear_num)
 elif opt.use_efficient:
-    model = ft_net_efficient(len(class_names), opt.droprate, circle = return_feature, linear_num=opt.linear_num)
+    model = ft_net_efficient(len(class_names), opt.droprate,
+                             circle=return_feature, linear_num=opt.linear_num)
 elif opt.use_hr:
-    model = ft_net_hr(len(class_names), opt.droprate, circle = return_feature, linear_num=opt.linear_num)
+    model = ft_net_hr(len(class_names), opt.droprate,
+                      circle=return_feature, linear_num=opt.linear_num)
 else:
-    model = ft_net(len(class_names), opt.droprate, opt.stride, circle = return_feature, ibn=opt.ibn, linear_num=opt.linear_num)
+    model = ft_net(len(class_names), opt.droprate, opt.stride,
+                   circle=return_feature, ibn=opt.ibn, linear_num=opt.linear_num)
 
 if opt.PCB:
     model = PCB(len(class_names))
@@ -505,60 +522,64 @@ model = model.cuda()
 if fp16:
     model = model.half()
 
-optim_name = optim.SGD #apex.optimizers.FusedSGD
-if opt.FSGD: # apex is needed
+optim_name = optim.SGD  # apex.optimizers.FusedSGD
+if opt.FSGD:  # apex is needed
     optim_name = FusedSGD
 
 if not opt.PCB:
     ignored_params = list(map(id, model.classifier.parameters()))
-    base_params = filter(lambda p: id(p) not in ignored_params, model.parameters())
+    base_params = filter(lambda p: id(
+        p) not in ignored_params, model.parameters())
     classifier_params = model.classifier.parameters()
     optimizer_ft = optim_name([
-             {'params': base_params, 'lr': 0.1*opt.lr},
-             {'params': classifier_params, 'lr': opt.lr}
-         ], weight_decay=5e-4, momentum=0.9, nesterov=True)
+        {'params': base_params, 'lr': 0.1 * opt.lr},
+        {'params': classifier_params, 'lr': opt.lr}
+    ], weight_decay=5e-4, momentum=0.9, nesterov=True)
 else:
-    ignored_params = list(map(id, model.model.fc.parameters() ))
-    ignored_params += (list(map(id, model.classifier0.parameters() )) 
-                     +list(map(id, model.classifier1.parameters() ))
-                     +list(map(id, model.classifier2.parameters() ))
-                     +list(map(id, model.classifier3.parameters() ))
-                     +list(map(id, model.classifier4.parameters() ))
-                     +list(map(id, model.classifier5.parameters() ))
-                     #+list(map(id, model.classifier6.parameters() ))
-                     #+list(map(id, model.classifier7.parameters() ))
-                      )
-    base_params = filter(lambda p: id(p) not in ignored_params, model.parameters())
-    classifier_params = filter(lambda p: id(p) in ignored_params, model.parameters())
+    ignored_params = list(map(id, model.model.fc.parameters()))
+    ignored_params += (list(map(id, model.classifier0.parameters()))
+                       + list(map(id, model.classifier1.parameters()))
+                       + list(map(id, model.classifier2.parameters()))
+                       + list(map(id, model.classifier3.parameters()))
+                       + list(map(id, model.classifier4.parameters()))
+                       + list(map(id, model.classifier5.parameters()))
+                       #+list(map(id, model.classifier6.parameters() ))
+                       #+list(map(id, model.classifier7.parameters() ))
+                       )
+    base_params = filter(lambda p: id(
+        p) not in ignored_params, model.parameters())
+    classifier_params = filter(lambda p: id(
+        p) in ignored_params, model.parameters())
     optimizer_ft = optim_name([
-             {'params': base_params, 'lr': 0.1*opt.lr},
-             {'params': classifier_params, 'lr': opt.lr}
-         ], weight_decay=5e-4, momentum=0.9, nesterov=True)
+        {'params': base_params, 'lr': 0.1 * opt.lr},
+        {'params': classifier_params, 'lr': opt.lr}
+    ], weight_decay=5e-4, momentum=0.9, nesterov=True)
 
 # Decay LR by a factor of 0.1 every 40 epochs
-exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=opt.total_epoch*2//3, gamma=0.1)
+exp_lr_scheduler = lr_scheduler.StepLR(
+    optimizer_ft, step_size=opt.total_epoch * 2 // 3, gamma=0.1)
 if opt.cosine:
-    exp_lr_scheduler = lr_scheduler.CosineAnnealingLR(optimizer_ft, opt.total_epoch, eta_min=0.01*opt.lr)
+    exp_lr_scheduler = lr_scheduler.CosineAnnealingLR(
+        optimizer_ft, opt.total_epoch, eta_min=0.01 * opt.lr)
 
 ######################################################################
 # Train and evaluate
 # ^^^^^^^^^^^^^^^^^^
 #
-# It should take around 1-2 hours on GPU. 
+# It should take around 1-2 hours on GPU.
 #
-dir_name = os.path.join('./model',name)
+dir_name = os.path.join('./model', name)
 if not os.path.isdir(dir_name):
     os.mkdir(dir_name)
-#record every run
-copyfile('./train.py', dir_name+'/train.py')
-copyfile('./model.py', dir_name+'/model.py')
+# record every run
+copyfile('./train.py', dir_name + '/train.py')
+copyfile('./model.py', dir_name + '/model.py')
 
 # save opts
-with open('%s/opts.yaml'%dir_name,'w') as fp:
+with open('%s/opts.yaml' % dir_name, 'w') as fp:
     yaml.dump(vars(opt), fp, default_flow_style=False)
 
 criterion = nn.CrossEntropyLoss()
 
 model = train_model(model, criterion, optimizer_ft, exp_lr_scheduler,
-                       start_epoch=opt.start_epoch, num_epochs=opt.total_epoch)
-
+                    start_epoch=opt.start_epoch, num_epochs=opt.total_epoch)

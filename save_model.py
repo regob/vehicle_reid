@@ -38,8 +38,8 @@ transform_val_list = [
 ]
 val_transform = transforms.Compose(transform_val_list)
 
-val_df = pd.read_csv(old_opts["val_csv_path"])
-dataset = ImageDataset("", val_df, "id", transform=val_transform)
+train_df = pd.read_csv(old_opts["train_csv_path"])
+dataset = ImageDataset("", train_df, "id", transform=val_transform)
 class_names = dataset.classes
 
 return_feature = False
