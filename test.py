@@ -169,8 +169,6 @@ if use_gpu:
 since = time.time()
 with torch.no_grad():
     query_feature, query_labels = extract_feature(model, dataloaders['query'])
-    print(query_feature[0])
-    print(query_labels[:30])
     gallery_feature, gallery_labels = extract_feature(
         model, dataloaders['gallery'])
 
