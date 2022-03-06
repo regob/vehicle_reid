@@ -82,7 +82,7 @@ parser.add_argument('--ibn', action='store_true', help='use resnet+ibn')
 parser.add_argument('--DG', action='store_true',
                     help='use extra DG-Market Dataset for training. Please download it from https://github.com/NVlabs/DG-Net#dg-market.')
 parser.add_argument('--fp16', action='store_true',
-                    help='use float16 instead of float32, which will save about 50 memory')
+                    help='use float16 instead of float32, which will save about 50 percent memory')
 parser.add_argument('--cosine', action='store_true', help='use cosine lrRate')
 parser.add_argument('--FSGD', action='store_true',
                     help='use fused sgd, which will speed up trainig slightly. apex is needed.')
@@ -115,10 +115,7 @@ if len(gpu_ids) > 0:
 # ---------
 #
 
-if opt.use_swin:
-    h, w = 224, 224
-else:
-    h, w = 256, 128
+h, w = 224, 224
 
 transform_train_list = [
     # transforms.RandomResizedCrop(size=128, scale=(0.75,1.0), ratio=(0.75,1.3333), interpolation=3), #Image.BICUBIC)
@@ -242,26 +239,31 @@ def train_model(model, criterion, optimizer, scheduler, start_epoch=0, num_epoch
     warm_iteration = round(
         dataset_sizes['train'] / opt.batchsize) * opt.warm_epoch
     if opt.arcface:
-        criterion_arcface = losses.ArcFaceLoss(num_classes=opt.nclasses, embedding_size=512)
-    if opt.cosface: 
-        criterion_cosface = losses.CosFaceLoss(num_classes=opt.nclasses, embedding_size=512)
+        criterion_arcface = losses.ArcFaceLoss(
+            num_classes=opt.nclasses, embedding_size=512)
+    if opt.cosface:
+        criterion_cosface = losses.CosFaceLoss(
+            num_classes=opt.nclasses, embedding_size=512)
     if opt.circle:
-        criterion_circle = CircleLoss(m=0.25, gamma=32) # gamma = 64 may lead to a better result.
+        # gamma = 64 may lead to a better result.
+        criterion_circle = CircleLoss(m=0.25, gamma=32)
     if opt.triplet:
         miner = miners.MultiSimilarityMiner()
         criterion_triplet = losses.TripletMarginLoss(margin=0.3)
     if opt.lifted:
-        criterion_lifted = losses.GeneralizedLiftedStructureLoss(neg_margin=1, pos_margin=0)
-    if opt.contrast: 
+        criterion_lifted = losses.GeneralizedLiftedStructureLoss(
+            neg_margin=1, pos_margin=0)
+    if opt.contrast:
         criterion_contrast = losses.ContrastiveLoss(pos_margin=0, neg_margin=1)
     if opt.instance:
-        criterion_instance = InstanceLoss(gamma = opt.ins_gamma)
+        criterion_instance = InstanceLoss(gamma=opt.ins_gamma)
     if opt.sphere:
-        criterion_sphere = losses.SphereFaceLoss(num_classes=opt.nclasses, embedding_size=512, margin=4)
+        criterion_sphere = losses.SphereFaceLoss(
+            num_classes=opt.nclasses, embedding_size=512, margin=4)
     for epoch in range(start_epoch, num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
-        
+
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
             if phase == 'train':
@@ -275,10 +277,10 @@ def train_model(model, criterion, optimizer, scheduler, start_epoch=0, num_epoch
             for data in tqdm.tqdm(dataloaders[phase]):
                 # get the inputs
                 inputs, labels = data
-                now_batch_size,c,h,w = inputs.shape
-                if now_batch_size<opt.batchsize: # skip the last batch
+                now_batch_size, c, h, w = inputs.shape
+                if now_batch_size < opt.batchsize:  # skip the last batch
                     continue
-                #print(inputs.shape)
+                # print(inputs.shape)
                 # wrap them in Variable
                 if use_gpu:
                     inputs = Variable(inputs.cuda().detach())
@@ -288,7 +290,7 @@ def train_model(model, criterion, optimizer, scheduler, start_epoch=0, num_epoch
                 # if we use low precision, input also need to be fp16
                 if fp16:
                     inputs = inputs.half()
- 
+
                 # zero the parameter gradients
                 optimizer.zero_grad()
 
@@ -302,21 +304,23 @@ def train_model(model, criterion, optimizer, scheduler, start_epoch=0, num_epoch
                 sm = nn.Softmax(dim=1)
                 log_sm = nn.LogSoftmax(dim=1)
                 return_feature = opt.arcface or opt.cosface or opt.circle or opt.triplet or opt.contrast or opt.instance or opt.lifted or opt.sphere
-                if return_feature: 
+                if return_feature:
                     logits, ff = outputs
                     fnorm = torch.norm(ff, p=2, dim=1, keepdim=True)
                     ff = ff.div(fnorm.expand_as(ff))
-                    loss = criterion(logits, labels) 
+                    loss = criterion(logits, labels)
                     _, preds = torch.max(logits.data, 1)
                     if opt.arcface:
-                        loss +=  criterion_arcface(ff, labels)/now_batch_size
+                        loss += criterion_arcface(ff, labels) / now_batch_size
                     if opt.cosface:
-                        loss +=  criterion_cosface(ff, labels)/now_batch_size
+                        loss += criterion_cosface(ff, labels) / now_batch_size
                     if opt.circle:
-                        loss +=  criterion_circle(*convert_label_to_similarity( ff, labels))/now_batch_size
+                        loss += criterion_circle(
+                            *convert_label_to_similarity(ff, labels)) / now_batch_size
                     if opt.triplet:
                         hard_pairs = miner(ff, labels)
-                        loss +=  criterion_triplet(ff, labels, hard_pairs) #/now_batch_size
+                        # /now_batch_size
+                        loss += criterion_triplet(ff, labels, hard_pairs)
                     if opt.lifted:
                         loss +=  criterion_lifted(ff, labels) #/now_batch_size
                     if opt.contrast:
