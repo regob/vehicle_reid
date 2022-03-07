@@ -44,7 +44,7 @@ parser.add_argument('--gpu_ids', default='0', type=str,
                     help='gpu_ids: e.g. 0  0,1,2  0,2')
 parser.add_argument('--batchsize', default=256, type=int, help='batchsize')
 # parser.add_argument('--multi', action='store_true', help='use multiple query')
-parser.add_argument('--fp16', action='store_true', help='use fp16.')
+# parser.add_argument('--fp16', action='store_true', help='use fp16.')
 parser.add_argument('--ms', default='1', type=str,
                     help='multiple_scale: e.g. 1 1,1.1  1,1.1,1.2')
 opt = parser.parse_args()
@@ -56,14 +56,6 @@ if opt.opts_yaml:
 else:
     config = {}
 
-
-str_ids = opt.gpu_ids.split(',')
-gpu_ids = []
-for str_id in str_ids:
-    id = int(str_id)
-    if id >= 0:
-        gpu_ids.append(id)
-
 print('We use the scale: %s' % opt.ms)
 str_ms = opt.ms.split(',')
 ms = []
@@ -71,10 +63,24 @@ for s in str_ms:
     s_f = float(s)
     ms.append(math.sqrt(s_f))
 
-# set gpu ids
-if len(gpu_ids) > 0:
-    torch.cuda.set_device(gpu_ids[0])
-    cudnn.benchmark = True
+
+use_gpu = torch.cuda.is_available()
+if not use_gpu:
+    device = torch.device("cpu")
+else:
+    str_ids = opt.gpu_ids.split(',')
+    gpu_ids = []
+    for str_id in str_ids:
+        id = int(str_id)
+        if id >= 0:
+            gpu_ids.append(id)
+
+    # set gpu ids
+    if len(gpu_ids) > 0:
+        torch.cuda.set_device(gpu_ids[0])
+        cudnn.benchmark = True
+
+    device = torch.device("cuda")
 
 ######################################################################
 # Load Data
@@ -100,7 +106,6 @@ image_datasets = {
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=opt.batchsize,
                                               shuffle=False, num_workers=2) for x in ['gallery', 'query']}
 
-use_gpu = torch.cuda.is_available()
 
 ######################################################################
 # Extract feature
@@ -119,7 +124,7 @@ def fliplr(img):
 
 def extract_feature(model, dataloader):
     img_count = 0
-    dummy = next(iter(dataloader))[0].cuda()
+    dummy = next(iter(dataloader))[0].to(device)
     output = model(dummy)
     feature_dim = output.shape[1]
     labels = []
@@ -128,7 +133,7 @@ def extract_feature(model, dataloader):
         X, y = data
         n, c, h, w = X.size()
         img_count += n
-        ff = torch.FloatTensor(n, feature_dim).zero_().cuda()
+        ff = torch.FloatTensor(n, feature_dim).zero_().to(device)
 
         for lab in y:
             labels.append(lab)
@@ -136,7 +141,7 @@ def extract_feature(model, dataloader):
         for i in range(2):
             if(i == 1):
                 X = fliplr(X)
-            input_X = Variable(X.cuda())
+            input_X = Variable(X.to(device))
             for scale in ms:
                 if scale != 1:
                     input_X = nn.functional.interpolate(
@@ -159,11 +164,11 @@ def extract_feature(model, dataloader):
 ######################################################################
 # Load Collected data Trained model
 print('-------test-----------')
+print("Running on: {}".format(device))
 
 model = torch.load(opt.model_path)
 model = model.eval()
-if use_gpu:
-    model = model.cuda()
+model.to(device)
 
 # Extract feature
 since = time.time()
@@ -184,4 +189,5 @@ scipy.io.savemat('pytorch_result.mat', result)
 print("Feature extraction finished, starting evaluation ...")
 
 result = os.path.join("model", opt.name, "result.txt")
-os.system('python3 evaluate_gpu.py | tee -a %s' % result)
+os.system('python3 evaluate.py %s | tee -a %s' %
+          ("--gpu" if use_gpu else "", result))
