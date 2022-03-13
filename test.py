@@ -167,7 +167,7 @@ print('-------test-----------')
 print("Running on: {}".format(device))
 
 model = torch.load(opt.model_path)
-model = model.eval()
+model.eval()
 model.to(device)
 
 # Extract feature
@@ -189,5 +189,4 @@ scipy.io.savemat('pytorch_result.mat', result)
 print("Feature extraction finished, starting evaluation ...")
 
 result = os.path.join("model", opt.name, "result.txt")
-os.system('python3 evaluate.py %s | tee -a %s' %
-          ("--gpu" if use_gpu else "", result))
+os.system('python3 evaluate.py | tee -a %s' % (result))

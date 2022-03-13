@@ -49,6 +49,9 @@ def compute_mAP(index, good_index, junk_index):
     rows_good = np.argwhere(mask)
     rows_good = rows_good.flatten()
 
+#    print(rows_good)
+#    sys.exit()
+
     cmc[rows_good[0]:] = 1
     for i in range(ngood):
         d_recall = 1.0 / ngood

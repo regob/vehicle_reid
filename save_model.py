@@ -4,12 +4,10 @@ import torch
 from torch import nn
 from torchvision import transforms
 
-import pandas as pd
 import yaml
 import argparse
 
 from model import ft_net
-from tools.dataset import ImageDataset
 
 parser = argparse.ArgumentParser(
     description="Save model from training checkpoint")
@@ -30,20 +28,9 @@ with open(os.path.join(model_dir, "opts.yaml"), "r") as stream:
         print(exc)
         sys.exit(1)
 
-h, w = 224, 224
-transform_val_list = [
-    transforms.Resize(size=(h, w), interpolation=3),  # Image.BICUBIC
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-]
-val_transform = transforms.Compose(transform_val_list)
-
-train_df = pd.read_csv(old_opts["train_csv_path"])
-dataset = ImageDataset("", train_df, "id", transform=val_transform)
-class_names = dataset.classes
 
 return_feature = False
-model = ft_net(len(class_names), old_opts["droprate"], old_opts["stride"], circle=return_feature,
+model = ft_net(old_opts["nclasses"], old_opts["droprate"], old_opts["stride"], circle=return_feature,
                ibn=old_opts["ibn"], linear_num=old_opts["linear_num"])
 
 

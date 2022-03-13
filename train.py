@@ -475,6 +475,9 @@ def save_network(network, epoch_label):
 
 def load_network(network, path):
     sdict = torch.load(path)
+    if network.classifier.classifier[0].weight.shape != sdict["classifier.classifier.0.weight"].shape:
+        sdict["classifier.classifier.0.weight"] = network.classifier.classifier[0].weight
+        sdict["classifier.classifier.0.bias"] = network.classifier.classifier[0].bias
     network.load_state_dict(sdict)
     return network
 
