@@ -14,13 +14,17 @@ import torchvision
 from torchvision import datasets, models, transforms
 import time
 import os
+import sys
 import scipy.io
 import yaml
 import math
-from model import ft_net, ft_net_dense, ft_net_hr, ft_net_swin, ft_net_efficient, ft_net_NAS, PCB, PCB_test
-
 import pandas as pd
 import tqdm
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
+from load_model import load_model_from_opts
 from tools.dataset import ImageDataset
 
 ######################################################################
@@ -28,18 +32,16 @@ from tools.dataset import ImageDataset
 # --------
 
 parser = argparse.ArgumentParser(description='Test')
-parser.add_argument("--model_path", required=True,
-                    type=str, help="model to use")
+parser.add_argument("--model_opts", required=True,
+                    type=str, help="model saved options")
+parser.add_argument("--checkpoint", required=True,
+                    type=str, help="model checkpoint to load")
 parser.add_argument("--query_csv_path", required=True,
                     type=str, help="csv to contain query image data")
 parser.add_argument("--gallery_csv_path", required=True,
                     type=str, help="csv to contain gallery image data")
 parser.add_argument("--data_dir", type=str, required=True,
                     help="root directory for image datasets")
-parser.add_argument('--name', default='ft_ResNet50',
-                    type=str, help='model name')
-parser.add_argument("--opts_yaml", type=str, default="",
-                    help="yaml file with options saved from training")
 parser.add_argument('--gpu_ids', default='0', type=str,
                     help='gpu_ids: e.g. 0  0,1,2  0,2')
 parser.add_argument('--batchsize', default=256, type=int, help='batchsize')
@@ -49,12 +51,6 @@ parser.add_argument('--ms', default='1', type=str,
                     help='multiple_scale: e.g. 1 1,1.1  1,1.1,1.2')
 opt = parser.parse_args()
 
-if opt.opts_yaml:
-    with open(opt.opts_yaml, 'r') as stream:
-        # for the new pyyaml via 'conda install pyyaml'
-        config = yaml.load(stream, Loader=yaml.FullLoader)
-else:
-    config = {}
 
 print('We use the scale: %s' % opt.ms)
 str_ms = opt.ms.split(',')
@@ -62,7 +58,6 @@ ms = []
 for s in str_ms:
     s_f = float(s)
     ms.append(math.sqrt(s_f))
-
 
 use_gpu = torch.cuda.is_available()
 if not use_gpu:
@@ -97,10 +92,11 @@ data_transforms = transforms.Compose([
 
 query_df = pd.read_csv(opt.query_csv_path)
 gallery_df = pd.read_csv(opt.gallery_csv_path)
+classes = list(pd.concat([query_df["id"], gallery_df["id"]]).unique())
 
 image_datasets = {
-    "query": ImageDataset(opt.data_dir, query_df, "id", transform=data_transforms),
-    "gallery": ImageDataset(opt.data_dir, gallery_df, "id", transform=data_transforms)
+    "query": ImageDataset(opt.data_dir, query_df, "id", classes, transform=data_transforms),
+    "gallery": ImageDataset(opt.data_dir, gallery_df, "id", classes, transform=data_transforms)
 }
 
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=opt.batchsize,
@@ -162,11 +158,14 @@ def extract_feature(model, dataloader):
 
 
 ######################################################################
-# Load Collected data Trained model
+# Load model
+# ----------
+
 print('-------test-----------')
 print("Running on: {}".format(device))
 
-model = torch.load(opt.model_path)
+model = load_model_from_opts(opt.model_opts, ckpt=opt.checkpoint,
+                             remove_classifier=True)
 model.eval()
 model.to(device)
 
@@ -187,6 +186,4 @@ result = {'gallery_f': gallery_feature.numpy(), 'gallery_label': gallery_labels,
 scipy.io.savemat('pytorch_result.mat', result)
 
 print("Feature extraction finished, starting evaluation ...")
-
-result = os.path.join("model", opt.name, "result.txt")
-os.system('python3 evaluate.py | tee -a %s' % (result))
+os.system('python3 evaluate.py')

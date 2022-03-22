@@ -5,10 +5,14 @@ from torch.autograd import Variable
 from torchvision import transforms
 import argparse
 import os
+import sys
 import matplotlib.pyplot as plt
 import tqdm
 import math
 import random
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 from tools.dataset import ImageDataset
 
@@ -54,11 +58,14 @@ data_transforms = transforms.Compose([
 
 query_df = pd.read_csv(args.query_csv_path)
 gallery_df = pd.read_csv(args.gallery_csv_path)
-gallery_df = gallery_df.loc[:640].copy()
+classes = list(pd.concat([query_df["id"], gallery_df["id"]]).unique())
+
+#gallery_df = gallery_df.loc[:640].copy()
+
 
 image_datasets = {
-    "query": ImageDataset(args.data_dir, query_df, "id", transform=data_transforms),
-    "gallery": ImageDataset(args.data_dir, gallery_df, "id", transform=data_transforms)
+    "query": ImageDataset(args.data_dir, query_df, "id", classes, transform=data_transforms),
+    "gallery": ImageDataset(args.data_dir, gallery_df, "id", classes, transform=data_transforms),
 }
 
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=args.batchsize,
@@ -134,7 +141,7 @@ def get_scores(query_feature, gallery_features):
     score = torch.mm(gallery_features, query)
     score = score.squeeze(1).cpu()
     score = score.numpy()
-    return np.argsort(score)[::-1]
+    return score
 
 
 def show_query_result(axes, query_img, gallery_imgs, query_label, gallery_labels):
@@ -200,11 +207,14 @@ def refresh_plot():
     with torch.no_grad():
         q_feature = extract_feature(model, X).cpu()
 
-    gallery_sorted = get_scores(q_feature, gallery_features)
+    gallery_scores = get_scores(q_feature, gallery_features)
+    idx = np.argsort(gallery_scores)[::-1]
+    g_labels = np.array(gallery_labels)[idx]
+
     q_img = dataset.get_image(curr_idx)
-    g_imgs = [image_datasets["gallery"].get_image(idx)
-              for idx in gallery_sorted[:args.num_images]]
-    show_query_result(axes, q_img, g_imgs, y, gallery_labels)
+    g_imgs = [image_datasets["gallery"].get_image(i)
+              for i in idx[:args.num_images]]
+    show_query_result(axes, q_img, g_imgs, y, g_labels)
     fig.canvas.draw()
     fig.canvas.flush_events()
 

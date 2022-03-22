@@ -16,17 +16,22 @@ import matplotlib.pyplot as plt
 #from PIL import Image
 import time
 import os
-from model import ft_net, ft_net_dense, ft_net_hr, ft_net_swin, ft_net_efficient, ft_net_NAS, PCB
-from random_erasing import RandomErasing
-from dgfolder import DGFolder
+import sys
 import yaml
 from shutil import copyfile
-from circle_loss import CircleLoss, convert_label_to_similarity
-from instance_loss import InstanceLoss
 import pandas as pd
 import tqdm
 
 version = torch.__version__
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
+from random_erasing import RandomErasing
+from dgfolder import DGFolder
+from circle_loss import CircleLoss, convert_label_to_similarity
+from instance_loss import InstanceLoss
+
 
 # pip install pytorch-metric-learning
 from pytorch_metric_learning import losses, miners
