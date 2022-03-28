@@ -3,7 +3,7 @@ import torch
 from torch import nn
 import yaml
 
-from vehicle_reid.model import ft_net, ft_net_dense, ft_net_hr, ft_net_swin, ft_net_efficient, ft_net_NAS, PCB
+from reid.vehicle_reid.model import ft_net, ft_net_dense, ft_net_hr, ft_net_swin, ft_net_efficient, ft_net_NAS, PCB
 
 
 def load_weights(model, ckpt_path):

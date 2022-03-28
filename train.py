@@ -13,7 +13,7 @@ import torch.backends.cudnn as cudnn
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
-#from PIL import Image
+# from PIL import Image
 import time
 import os
 import sys
@@ -31,6 +31,7 @@ from random_erasing import RandomErasing
 from dgfolder import DGFolder
 from circle_loss import CircleLoss, convert_label_to_similarity
 from instance_loss import InstanceLoss
+from load_model import load_model_from_opts
 
 
 # pip install pytorch-metric-learning
@@ -45,84 +46,95 @@ parser.add_argument('--gpu_ids', default='0', type=str,
                     help='gpu_ids: e.g. 0  0,1,2  0,2')
 parser.add_argument('--name', default='ft_ResNet50',
                     type=str, help='output model name')
-parser.add_argument('--data_dir', default='../Market/pytorch',
-                    type=str, help='training dir path')
-parser.add_argument('--train_all', action='store_true',
-                    help='use all training data')
-parser.add_argument('--color_jitter', action='store_true',
-                    help='use color jitter in training')
-parser.add_argument('--batchsize', default=32, type=int, help='batchsize')
-parser.add_argument('--linear_num', default=512, type=int,
-                    help='feature dimension: 512 or default or 0 (linear=False)')
-parser.add_argument('--stride', default=2, type=int, help='stride')
-parser.add_argument('--erasing_p', default=0, type=float,
-                    help='Random Erasing probability, in [0,1]')
-parser.add_argument('--use_dense', action='store_true', help='use densenet121')
-parser.add_argument('--use_swin', action='store_true',
-                    help='use swin transformer 224x224')
-parser.add_argument('--use_efficient', action='store_true',
-                    help='use efficientnet-b4')
-parser.add_argument('--use_NAS', action='store_true', help='use NAS')
-parser.add_argument('--use_hr', action='store_true', help='use NAS')
-parser.add_argument('--warm_epoch', default=0, type=int,
-                    help='the first K epoch that needs warm up')
-parser.add_argument('--total_epoch', default=60,
-                    type=int, help='total training epoch')
-parser.add_argument('--lr', default=0.05, type=float, help='learning rate')
-parser.add_argument('--droprate', default=0.5, type=float, help='drop rate')
-parser.add_argument('--PCB', action='store_true', help='use PCB+ResNet50')
-parser.add_argument('--arcface', action='store_true', help='use ArcFace loss')
-parser.add_argument('--circle', action='store_true', help='use Circle loss')
-parser.add_argument('--cosface', action='store_true', help='use CosFace loss')
-parser.add_argument('--contrast', action='store_true',
-                    help='use contrast loss')
-parser.add_argument('--instance', action='store_true',
-                    help='use instance loss')
-parser.add_argument('--ins_gamma', default=32, type=int,
-                    help='gamma for instance loss')
-parser.add_argument('--triplet', action='store_true', help='use triplet loss')
-parser.add_argument('--lifted', action='store_true', help='use lifted loss')
-parser.add_argument('--sphere', action='store_true', help='use sphere loss')
-parser.add_argument('--ibn', action='store_true', help='use resnet+ibn')
-parser.add_argument('--DG', action='store_true',
-                    help='use extra DG-Market Dataset for training. Please download it from https://github.com/NVlabs/DG-Net#dg-market.')
-parser.add_argument('--fp16', action='store_true',
-                    help='use float16 instead of float32, which will save about 50 percent memory')
-parser.add_argument('--cosine', action='store_true', help='use cosine lrRate')
-parser.add_argument('--FSGD', action='store_true',
-                    help='use fused sgd, which will speed up trainig slightly. apex is needed.')
-parser.add_argument("--train_csv_path", default="", type=str)
-parser.add_argument("--val_csv_path", default="", type=str)
-parser.add_argument("--save_freq", default=1, type=int,
-                    help="frequency of saving the model in epochs")
-parser.add_argument("--checkpoint", default="", type=str,
-                    help="Model checkpoint to load.")
-parser.add_argument("--start_epoch", default=0, type=int,
-                    help="Epoch to continue training from.")
-opt = parser.parse_args()
+parser.add_argument('--data_dir', default='../../datasets/')
+                    type = str, help = 'training dir path')
+parser.add_argument('--train_all', action = 'store_true',
+                    help = 'use all training data')
+parser.add_argument('--color_jitter', action = 'store_true',
+                    help = 'use color jitter in training')
+parser.add_argument('--batchsize', default = 32,
+                    type = int, help = 'batchsize')
+parser.add_argument('--linear_num', default = 512, type = int,
+                    help = 'feature dimension: 512 or default or 0 (linear=False)')
+parser.add_argument('--stride', default = 2, type = int, help = 'stride')
+parser.add_argument('--erasing_p', default = 0, type = float,
+                    help = 'Random Erasing probability, in [0,1]')
+parser.add_argument('--use_dense', action = 'store_true',
+                    help = 'use densenet121')
+parser.add_argument('--use_swin', action = 'store_true',
+                    help = 'use swin transformer 224x224')
+parser.add_argument('--use_efficient', action = 'store_true',
+                    help = 'use efficientnet-b4')
+parser.add_argument('--use_NAS', action = 'store_true', help = 'use NAS')
+parser.add_argument('--use_hr', action = 'store_true', help = 'use NAS')
+parser.add_argument('--warm_epoch', default = 0, type = int,
+                    help = 'the first K epoch that needs warm up')
+parser.add_argument('--total_epoch', default = 60,
+                    type = int, help = 'total training epoch')
+parser.add_argument('--lr', default = 0.05,
+                    type = float, help = 'learning rate')
+parser.add_argument('--droprate', default = 0.5,
+                    type = float, help = 'drop rate')
+parser.add_argument('--PCB', action = 'store_true', help = 'use PCB+ResNet50')
+parser.add_argument('--arcface', action = 'store_true',
+                    help = 'use ArcFace loss')
+parser.add_argument('--circle', action = 'store_true',
+                    help = 'use Circle loss')
+parser.add_argument('--cosface', action = 'store_true',
+                    help = 'use CosFace loss')
+parser.add_argument('--contrast', action = 'store_true',
+                    help = 'use contrast loss')
+parser.add_argument('--instance', action = 'store_true',
+                    help = 'use instance loss')
+parser.add_argument('--ins_gamma', default = 32, type = int,
+                    help = 'gamma for instance loss')
+parser.add_argument('--triplet', action = 'store_true',
+                    help = 'use triplet loss')
+parser.add_argument('--lifted', action = 'store_true',
+                    help = 'use lifted loss')
+parser.add_argument('--sphere', action = 'store_true',
+                    help = 'use sphere loss')
+parser.add_argument('--ibn', action = 'store_true', help = 'use resnet+ibn')
+parser.add_argument('--DG', action = 'store_true',
+                    help = 'use extra DG-Market Dataset for training. Please download it from https://github.com/NVlabs/DG-Net#dg-market.')
+parser.add_argument('--fp16', action = 'store_true',
+                    help = 'use float16 instead of float32, which will save about 50 percent memory')
+parser.add_argument('--cosine', action = 'store_true',
+                    help = 'use cosine lrRate')
+parser.add_argument('--FSGD', action = 'store_true',
+                    help = 'use fused sgd, which will speed up trainig slightly. apex is needed.')
+parser.add_argument("--train_csv_path", default = "", type = str)
+parser.add_argument("--val_csv_path", default = "", type = str)
+parser.add_argument("--save_freq", default = 1, type = int,
+                    help = "frequency of saving the model in epochs")
+parser.add_argument("--checkpoint", default = "", type = str,
+                    help = "Model checkpoint to load.")
+parser.add_argument("--start_epoch", default = 0, type = int,
+                    help = "Epoch to continue training from.")
+opt=parser.parse_args()
 
-fp16 = opt.fp16
-data_dir = opt.data_dir
-name = opt.name
-str_ids = opt.gpu_ids.split(',')
-gpu_ids = []
+fp16=opt.fp16
+data_dir=opt.data_dir
+name=opt.name
+str_ids=opt.gpu_ids.split(',')
+gpu_ids=[]
 for str_id in str_ids:
-    gid = int(str_id)
+    gid=int(str_id)
     if gid >= 0:
         gpu_ids.append(gid)
 
 # set gpu ids
 if len(gpu_ids) > 0:
     torch.cuda.set_device(gpu_ids[0])
-    cudnn.benchmark = True
+    cudnn.benchmark=True
 ######################################################################
 # Load Data
 # ---------
 #
 
-h, w = 224, 224
+h, w=224, 224
 
-transform_train_list = [
+transform_train_list=[
     # transforms.RandomResizedCrop(size=128, scale=(0.75,1.0), ratio=(0.75,1.3333), interpolation=3), #Image.BICUBIC)
     transforms.Resize((h, w), interpolation=3),
     transforms.Pad(10),
@@ -200,12 +212,13 @@ if opt.DG:
 
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
 class_names = image_datasets['train'].classes
+opt.nclasses = len(class_names)
 
 use_gpu = torch.cuda.is_available()
 
 since = time.time()
 inputs, classes = next(iter(dataloaders['train']))
-print(time.time() - since)
+print(f"Loading a sample batch took: {time.time() - since} seconds.")
 ######################################################################
 # Training the model
 # ------------------
@@ -238,8 +251,8 @@ def fliplr(img):
 def train_model(model, criterion, optimizer, scheduler, start_epoch=0, num_epochs=25):
     since = time.time()
 
-    #best_model_wts = model.state_dict()
-    #best_acc = 0.0
+    # best_model_wts = model.state_dict()
+    # best_acc = 0.0
     warm_up = 0.1  # We start from the 0.1*lrRate
     warm_iteration = round(
         dataset_sizes['train'] / opt.batchsize) * opt.warm_epoch
@@ -437,7 +450,7 @@ def train_model(model, criterion, optimizer, scheduler, start_epoch=0, num_epoch
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(
         time_elapsed // 60, time_elapsed % 60))
-    #print('Best val Acc: {:4f}'.format(best_acc))
+    # print('Best val Acc: {:4f}'.format(best_acc))
 
     # load best model weights
     model.load_state_dict(last_model_wts)
@@ -478,13 +491,30 @@ def save_network(network, epoch_label):
         network.cuda(gpu_ids[0])
 
 
-def load_network(network, path):
-    sdict = torch.load(path)
-    if network.classifier.classifier[0].weight.shape != sdict["classifier.classifier.0.weight"].shape:
-        sdict["classifier.classifier.0.weight"] = network.classifier.classifier[0].weight
-        sdict["classifier.classifier.0.bias"] = network.classifier.classifier[0].bias
-    network.load_state_dict(sdict)
-    return network
+######################################################################
+# Save opts and load model
+# ----------------------
+
+dir_name = os.path.join('./model', name)
+if not os.path.isdir(dir_name):
+    os.mkdir(dir_name)
+# record every run
+copyfile('./train.py', dir_name + '/train.py')
+copyfile('./model.py', dir_name + '/model.py')
+
+# save opts
+opts_file = "%s/opts.yaml" % dir_name
+with open(opts_file, 'w') as fp:
+    yaml.dump(vars(opt), fp, default_flow_style=False)
+
+return_feature = opt.arcface or opt.cosface or opt.circle or opt.triplet or opt.contrast or opt.instance or opt.lifted or opt.sphere
+
+model = load_model_from_opts(opts_file,
+                             ckpt=opt.checkpoint if opt.checkpoint else None,
+                             return_feature=return_feature)
+                             
+print(model)
+model.train()
 
 
 ######################################################################
@@ -494,37 +524,7 @@ def load_network(network, path):
 # Load a pretrainied model and reset final fully connected layer.
 #
 
-return_feature = opt.arcface or opt.cosface or opt.circle or opt.triplet or opt.contrast or opt.instance or opt.lifted or opt.sphere
-
-if opt.use_dense:
-    model = ft_net_dense(len(class_names), opt.droprate,
-                         circle=return_feature, linear_num=opt.linear_num)
-elif opt.use_NAS:
-    model = ft_net_NAS(len(class_names), opt.droprate,
-                       linear_num=opt.linear_num)
-elif opt.use_swin:
-    model = ft_net_swin(len(class_names), opt.droprate, opt.stride,
-                        circle=return_feature, linear_num=opt.linear_num)
-elif opt.use_efficient:
-    model = ft_net_efficient(len(class_names), opt.droprate,
-                             circle=return_feature, linear_num=opt.linear_num)
-elif opt.use_hr:
-    model = ft_net_hr(len(class_names), opt.droprate,
-                      circle=return_feature, linear_num=opt.linear_num)
-else:
-    model = ft_net(len(class_names), opt.droprate, opt.stride,
-                   circle=return_feature, ibn=opt.ibn, linear_num=opt.linear_num)
-
-if opt.PCB:
-    model = PCB(len(class_names))
-
-opt.nclasses = len(class_names)
-
-print(model)
-
-if opt.checkpoint:
-    model = load_network(model, opt.checkpoint)
-
+    
 # model to gpu
 model = model.cuda()
 if fp16:
@@ -551,8 +551,8 @@ else:
                        + list(map(id, model.classifier3.parameters()))
                        + list(map(id, model.classifier4.parameters()))
                        + list(map(id, model.classifier5.parameters()))
-                       #+list(map(id, model.classifier6.parameters() ))
-                       #+list(map(id, model.classifier7.parameters() ))
+                       # +list(map(id, model.classifier6.parameters() ))
+                       # +list(map(id, model.classifier7.parameters() ))
                        )
     base_params = filter(lambda p: id(
         p) not in ignored_params, model.parameters())
@@ -576,16 +576,6 @@ if opt.cosine:
 #
 # It should take around 1-2 hours on GPU.
 #
-dir_name = os.path.join('./model', name)
-if not os.path.isdir(dir_name):
-    os.mkdir(dir_name)
-# record every run
-copyfile('./train.py', dir_name + '/train.py')
-copyfile('./model.py', dir_name + '/model.py')
-
-# save opts
-with open('%s/opts.yaml' % dir_name, 'w') as fp:
-    yaml.dump(vars(opt), fp, default_flow_style=False)
 
 criterion = nn.CrossEntropyLoss()
 

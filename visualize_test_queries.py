@@ -14,6 +14,7 @@ import random
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
+from load_model import load_model_from_opts
 from tools.dataset import ImageDataset
 
 ######################################################################
@@ -22,13 +23,15 @@ from tools.dataset import ImageDataset
 
 parser = argparse.ArgumentParser(
     description="Show sample queries and retrieved gallery images for a reid model")
-parser.add_argument("--model_path", required=True,
+parser.add_argument("--model_opts", required=True,
                     type=str, help="model to use")
-parser.add_argument("--query_csv_path", required=True,
+parser.add_argument("--checkpoint", required=True,
+                    type=str, help="checkpoint to load for model.")
+parser.add_argument("--query_csv_path", default="../../datasets/id_split_cityflow_query.csv",
                     type=str, help="csv to contain query image data")
-parser.add_argument("--gallery_csv_path", required=True,
+parser.add_argument("--gallery_csv_path", default="../../datasets/id_split_cityflow_gallery.csv",
                     type=str, help="csv to contain gallery image data")
-parser.add_argument("--data_dir", type=str, required=True,
+parser.add_argument("--data_dir", type=str, default="../../datasets/",
                     help="root directory for image datasets")
 parser.add_argument("--input_size", type=int, default=224,
                     help="Image input size for the model")
@@ -176,7 +179,8 @@ def show_query_result(axes, query_img, gallery_imgs, query_label, gallery_labels
 #
 
 
-model = torch.load(args.model_path)
+model = load_model_from_opts(
+    args.model_opts, args.checkpoint, remove_classifier=True)
 model.eval()
 model.to(device)
 
