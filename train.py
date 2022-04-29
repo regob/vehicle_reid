@@ -46,95 +46,95 @@ parser.add_argument('--gpu_ids', default='0', type=str,
                     help='gpu_ids: e.g. 0  0,1,2  0,2')
 parser.add_argument('--name', default='ft_ResNet50',
                     type=str, help='output model name')
-parser.add_argument('--data_dir', default='../../datasets/')
-                    type = str, help = 'training dir path')
-parser.add_argument('--train_all', action = 'store_true',
-                    help = 'use all training data')
-parser.add_argument('--color_jitter', action = 'store_true',
-                    help = 'use color jitter in training')
-parser.add_argument('--batchsize', default = 32,
-                    type = int, help = 'batchsize')
-parser.add_argument('--linear_num', default = 512, type = int,
-                    help = 'feature dimension: 512 or default or 0 (linear=False)')
-parser.add_argument('--stride', default = 2, type = int, help = 'stride')
-parser.add_argument('--erasing_p', default = 0, type = float,
-                    help = 'Random Erasing probability, in [0,1]')
-parser.add_argument('--use_dense', action = 'store_true',
-                    help = 'use densenet121')
-parser.add_argument('--use_swin', action = 'store_true',
-                    help = 'use swin transformer 224x224')
-parser.add_argument('--use_efficient', action = 'store_true',
-                    help = 'use efficientnet-b4')
-parser.add_argument('--use_NAS', action = 'store_true', help = 'use NAS')
-parser.add_argument('--use_hr', action = 'store_true', help = 'use NAS')
-parser.add_argument('--warm_epoch', default = 0, type = int,
-                    help = 'the first K epoch that needs warm up')
-parser.add_argument('--total_epoch', default = 60,
-                    type = int, help = 'total training epoch')
-parser.add_argument('--lr', default = 0.05,
-                    type = float, help = 'learning rate')
-parser.add_argument('--droprate', default = 0.5,
-                    type = float, help = 'drop rate')
-parser.add_argument('--PCB', action = 'store_true', help = 'use PCB+ResNet50')
-parser.add_argument('--arcface', action = 'store_true',
-                    help = 'use ArcFace loss')
-parser.add_argument('--circle', action = 'store_true',
-                    help = 'use Circle loss')
-parser.add_argument('--cosface', action = 'store_true',
-                    help = 'use CosFace loss')
-parser.add_argument('--contrast', action = 'store_true',
-                    help = 'use contrast loss')
-parser.add_argument('--instance', action = 'store_true',
-                    help = 'use instance loss')
-parser.add_argument('--ins_gamma', default = 32, type = int,
-                    help = 'gamma for instance loss')
-parser.add_argument('--triplet', action = 'store_true',
-                    help = 'use triplet loss')
-parser.add_argument('--lifted', action = 'store_true',
-                    help = 'use lifted loss')
-parser.add_argument('--sphere', action = 'store_true',
-                    help = 'use sphere loss')
-parser.add_argument('--ibn', action = 'store_true', help = 'use resnet+ibn')
-parser.add_argument('--DG', action = 'store_true',
-                    help = 'use extra DG-Market Dataset for training. Please download it from https://github.com/NVlabs/DG-Net#dg-market.')
-parser.add_argument('--fp16', action = 'store_true',
-                    help = 'use float16 instead of float32, which will save about 50 percent memory')
-parser.add_argument('--cosine', action = 'store_true',
-                    help = 'use cosine lrRate')
-parser.add_argument('--FSGD', action = 'store_true',
-                    help = 'use fused sgd, which will speed up trainig slightly. apex is needed.')
-parser.add_argument("--train_csv_path", default = "", type = str)
-parser.add_argument("--val_csv_path", default = "", type = str)
-parser.add_argument("--save_freq", default = 1, type = int,
-                    help = "frequency of saving the model in epochs")
-parser.add_argument("--checkpoint", default = "", type = str,
-                    help = "Model checkpoint to load.")
-parser.add_argument("--start_epoch", default = 0, type = int,
-                    help = "Epoch to continue training from.")
-opt=parser.parse_args()
+parser.add_argument('--data_dir', default='../../datasets/',
+                    type=str, help='training dir path')
+parser.add_argument('--train_all', action='store_true',
+                    help='use all training data')
+parser.add_argument('--color_jitter', action='store_true',
+                    help='use color jitter in training')
+parser.add_argument('--batchsize', default=32,
+                    type=int, help='batchsize')
+parser.add_argument('--linear_num', default=512, type=int,
+                    help='feature dimension: 512 or default or 0 (linear=False)')
+parser.add_argument('--stride', default=2, type=int, help='stride')
+parser.add_argument('--erasing_p', default=0, type=float,
+                    help='Random Erasing probability, in [0,1]')
+parser.add_argument('--use_dense', action='store_true',
+                    help='use densenet121')
+parser.add_argument('--use_swin', action='store_true',
+                    help='use swin transformer 224x224')
+parser.add_argument('--use_efficient', action='store_true',
+                    help='use efficientnet-b4')
+parser.add_argument('--use_NAS', action='store_true', help='use NAS')
+parser.add_argument('--use_hr', action='store_true', help='use NAS')
+parser.add_argument('--warm_epoch', default=0, type=int,
+                    help='the first K epoch that needs warm up')
+parser.add_argument('--total_epoch', default=60,
+                    type=int, help='total training epoch')
+parser.add_argument('--lr', default=0.05,
+                    type=float, help='learning rate')
+parser.add_argument('--droprate', default=0.5,
+                    type=float, help='drop rate')
+parser.add_argument('--PCB', action='store_true', help='use PCB+ResNet50')
+parser.add_argument('--arcface', action='store_true',
+                    help='use ArcFace loss')
+parser.add_argument('--circle', action='store_true',
+                    help='use Circle loss')
+parser.add_argument('--cosface', action='store_true',
+                    help='use CosFace loss')
+parser.add_argument('--contrast', action='store_true',
+                    help='use contrast loss')
+parser.add_argument('--instance', action='store_true',
+                    help='use instance loss')
+parser.add_argument('--ins_gamma', default=32, type=int,
+                    help='gamma for instance loss')
+parser.add_argument('--triplet', action='store_true',
+                    help='use triplet loss')
+parser.add_argument('--lifted', action='store_true',
+                    help='use lifted loss')
+parser.add_argument('--sphere', action='store_true',
+                    help='use sphere loss')
+parser.add_argument('--ibn', action='store_true', help='use resnet+ibn')
+parser.add_argument('--DG', action='store_true',
+                    help='use extra DG-Market Dataset for training. Please download it from https://github.com/NVlabs/DG-Net#dg-market.')
+parser.add_argument('--fp16', action='store_true',
+                    help='use float16 instead of float32, which will save about 50 percent memory')
+parser.add_argument('--cosine', action='store_true',
+                    help='use cosine lrRate')
+parser.add_argument('--FSGD', action='store_true',
+                    help='use fused sgd, which will speed up trainig slightly. apex is needed.')
+parser.add_argument("--train_csv_path", default="", type=str)
+parser.add_argument("--val_csv_path", default="", type=str)
+parser.add_argument("--save_freq", default=1, type=int,
+                    help="frequency of saving the model in epochs")
+parser.add_argument("--checkpoint", default="", type=str,
+                    help="Model checkpoint to load.")
+parser.add_argument("--start_epoch", default=0, type=int,
+                    help="Epoch to continue training from.")
+opt = parser.parse_args()
 
-fp16=opt.fp16
-data_dir=opt.data_dir
-name=opt.name
-str_ids=opt.gpu_ids.split(',')
-gpu_ids=[]
+fp16 = opt.fp16
+data_dir = opt.data_dir
+name = opt.name
+str_ids = opt.gpu_ids.split(',')
+gpu_ids = []
 for str_id in str_ids:
-    gid=int(str_id)
+    gid = int(str_id)
     if gid >= 0:
         gpu_ids.append(gid)
 
 # set gpu ids
 if len(gpu_ids) > 0:
     torch.cuda.set_device(gpu_ids[0])
-    cudnn.benchmark=True
+    cudnn.benchmark = True
 ######################################################################
 # Load Data
 # ---------
 #
 
-h, w=224, 224
+h, w = 224, 224
 
-transform_train_list=[
+transform_train_list = [
     # transforms.RandomResizedCrop(size=128, scale=(0.75,1.0), ratio=(0.75,1.3333), interpolation=3), #Image.BICUBIC)
     transforms.Resize((h, w), interpolation=3),
     transforms.Pad(10),
@@ -476,7 +476,7 @@ def draw_curve(current_epoch):
     if current_epoch == 0:
         ax0.legend()
         ax1.legend()
-    fig.savefig(os.path.join('./model', name, 'train.jpg'))
+    fig.savefig(os.path.join(SCRIPT_DIR, "model", name, 'train.jpg'))
 
 ######################################################################
 # Save model
@@ -485,7 +485,7 @@ def draw_curve(current_epoch):
 
 def save_network(network, epoch_label):
     save_filename = 'net_%s.pth' % epoch_label
-    save_path = os.path.join('./model', name, save_filename)
+    save_path = os.path.join(SCRIPT_DIR, "model", name, save_filename)
     torch.save(network.cpu().state_dict(), save_path)
     if torch.cuda.is_available():
         network.cuda(gpu_ids[0])
@@ -495,12 +495,14 @@ def save_network(network, epoch_label):
 # Save opts and load model
 # ----------------------
 
-dir_name = os.path.join('./model', name)
+dir_name = os.path.join(SCRIPT_DIR, "model", name)
 if not os.path.isdir(dir_name):
     os.mkdir(dir_name)
 # record every run
-copyfile('./train.py', dir_name + '/train.py')
-copyfile('./model.py', dir_name + '/model.py')
+copyfile(os.path.join(SCRIPT_DIR, 'train.py'),
+         os.path.join(dir_name, "train.py"))
+copyfile(os.path.join(SCRIPT_DIR, "model.py"),
+         os.path.join(dir_name, "model.py"))
 
 # save opts
 opts_file = "%s/opts.yaml" % dir_name
