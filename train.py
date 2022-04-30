@@ -191,10 +191,11 @@ if not opt.train_csv_path:
 else:
     train_df = pd.read_csv(opt.train_csv_path)
     val_df = pd.read_csv(opt.val_csv_path)
+    all_ids = list(set(train_df["id"]).union(set(val_df["id"])))
     image_datasets["train"] = ImageDataset(
-        opt.data_dir, train_df, "id", transform=data_transforms["train"])
+        opt.data_dir, train_df, "id", classes=all_ids, transform=data_transforms["train"])
     image_datasets["val"] = ImageDataset(
-        opt.data_dir, val_df, "id", transform=data_transforms["val"])
+        opt.data_dir, val_df, "id", classes=all_ids, transform=data_transforms["val"])
 
 
 # 8 workers may work faster
@@ -514,7 +515,7 @@ return_feature = opt.arcface or opt.cosface or opt.circle or opt.triplet or opt.
 model = load_model_from_opts(opts_file,
                              ckpt=opt.checkpoint if opt.checkpoint else None,
                              return_feature=return_feature)
-                             
+
 print(model)
 model.train()
 
@@ -526,7 +527,7 @@ model.train()
 # Load a pretrainied model and reset final fully connected layer.
 #
 
-    
+
 # model to gpu
 model = model.cuda()
 if fp16:
