@@ -44,9 +44,7 @@ parser.add_argument("--data_dir", type=str, required=True,
                     help="root directory for image datasets")
 parser.add_argument('--gpu_ids', default='0', type=str,
                     help='gpu_ids: e.g. 0  0,1,2  0,2')
-parser.add_argument('--batchsize', default=256, type=int, help='batchsize')
-# parser.add_argument('--multi', action='store_true', help='use multiple query')
-# parser.add_argument('--fp16', action='store_true', help='use fp16.')
+parser.add_argument('--batchsize', default=32, type=int, help='batchsize')
 parser.add_argument('--ms', default='1', type=str,
                     help='multiple_scale: e.g. 1 1,1.1  1,1.1,1.2')
 opt = parser.parse_args()

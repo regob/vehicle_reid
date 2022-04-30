@@ -28,7 +28,6 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 from random_erasing import RandomErasing
-from dgfolder import DGFolder
 from circle_loss import CircleLoss, convert_label_to_similarity
 from instance_loss import InstanceLoss
 from load_model import load_model_from_opts
@@ -48,8 +47,6 @@ parser.add_argument('--name', default='ft_ResNet50',
                     type=str, help='output model name')
 parser.add_argument('--data_dir', default='../../datasets/',
                     type=str, help='training dir path')
-parser.add_argument('--train_all', action='store_true',
-                    help='use all training data')
 parser.add_argument('--color_jitter', action='store_true',
                     help='use color jitter in training')
 parser.add_argument('--batchsize', default=32,
@@ -95,14 +92,10 @@ parser.add_argument('--lifted', action='store_true',
 parser.add_argument('--sphere', action='store_true',
                     help='use sphere loss')
 parser.add_argument('--ibn', action='store_true', help='use resnet+ibn')
-parser.add_argument('--DG', action='store_true',
-                    help='use extra DG-Market Dataset for training. Please download it from https://github.com/NVlabs/DG-Net#dg-market.')
 parser.add_argument('--fp16', action='store_true',
                     help='use float16 instead of float32, which will save about 50 percent memory')
 parser.add_argument('--cosine', action='store_true',
                     help='use cosine lrRate')
-parser.add_argument('--FSGD', action='store_true',
-                    help='use fused sgd, which will speed up trainig slightly. apex is needed.')
 parser.add_argument("--train_csv_path", default="", type=str)
 parser.add_argument("--val_csv_path", default="", type=str)
 parser.add_argument("--save_freq", default=1, type=int,
@@ -177,14 +170,9 @@ data_transforms = {
     'val': transforms.Compose(transform_val_list),
 }
 
-
-train_all = ''
-if opt.train_all:
-    train_all = '_all'
-
 image_datasets = {}
 if not opt.train_csv_path:
-    image_datasets['train'] = datasets.ImageFolder(os.path.join(data_dir, 'train' + train_all),
+    image_datasets['train'] = datasets.ImageFolder(os.path.join(data_dir, 'train'),
                                                    data_transforms['train'])
     image_datasets['val'] = datasets.ImageFolder(os.path.join(data_dir, 'val'),
                                                  data_transforms['val'])
@@ -203,13 +191,6 @@ dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=opt.
                                               shuffle=True, num_workers=2, pin_memory=True)
                for x in ['train', 'val']}
 
-# Use extra DG-Market Dataset for training. Please download it from https://github.com/NVlabs/DG-Net#dg-market.
-if opt.DG:
-    image_datasets['DG'] = DGFolder(os.path.join('../DG-Market'),
-                                    data_transforms['train'])
-    dataloaders['DG'] = torch.utils.data.DataLoader(image_datasets['DG'], batch_size=max(8, opt.batchsize // 2),
-                                                    shuffle=True, num_workers=2, pin_memory=True)
-    DGloader_iter = enumerate(dataloaders['DG'])
 
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
 class_names = image_datasets['train'].classes
@@ -367,45 +348,7 @@ def train_model(model, criterion, optimizer, scheduler, start_epoch=0, num_epoch
                     loss = criterion(outputs, labels)
 
                 del inputs
-                # use extra DG Dataset (https://github.com/NVlabs/DG-Net#dg-market)
-                if opt.DG and phase == 'train' and epoch > num_epochs * 0.1:
-                    try:
-                        _, batch = DGloader_iter.__next__()
-                    except StopIteration:
-                        DGloader_iter = enumerate(dataloaders['DG'])
-                        _, batch = DGloader_iter.__next__()
-                    except UnboundLocalError:  # first iteration
-                        DGloader_iter = enumerate(dataloaders['DG'])
-                        _, batch = DGloader_iter.__next__()
 
-                    inputs1, inputs2, _ = batch
-                    inputs1 = inputs1.cuda().detach()
-                    inputs2 = inputs2.cuda().detach()
-                    # use memory in vivo loss (https://arxiv.org/abs/1912.11164)
-                    outputs1 = model(inputs1)
-                    if return_feature:
-                        outputs1, _ = outputs1
-                    elif opt.PCB:
-                        for i in range(num_part):
-                            part[i] = outputs1[i]
-                        outputs1 = part[0] + part[1] + \
-                            part[2] + part[3] + part[4] + part[5]
-                    outputs2 = model(inputs2)
-                    if return_feature:
-                        outputs2, _ = outputs2
-                    elif opt.PCB:
-                        for i in range(num_part):
-                            part[i] = outputs2[i]
-                        outputs2 = part[0] + part[1] + \
-                            part[2] + part[3] + part[4] + part[5]
-
-                    mean_pred = sm(outputs1 + outputs2)
-                    kl_loss = nn.KLDivLoss(size_average=False)
-                    reg = (kl_loss(log_sm(outputs2), mean_pred) +
-                           kl_loss(log_sm(outputs1), mean_pred)) / 2
-                    loss += 0.01 * reg
-                    del inputs1, inputs2
-                    # print(0.01*reg)
                 # backward + optimize only if in training phase
                 if epoch < opt.warm_epoch and phase == 'train':
                     warm_up = min(1.0, warm_up + 0.9 / warm_iteration)
@@ -534,8 +477,6 @@ if fp16:
     model = model.half()
 
 optim_name = optim.SGD  # apex.optimizers.FusedSGD
-if opt.FSGD:  # apex is needed
-    optim_name = FusedSGD
 
 if not opt.PCB:
     ignored_params = list(map(id, model.classifier.parameters()))
