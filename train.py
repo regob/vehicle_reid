@@ -109,12 +109,14 @@ opt = parser.parse_args()
 fp16 = opt.fp16
 data_dir = opt.data_dir
 name = opt.name
-str_ids = opt.gpu_ids.split(',')
+
 gpu_ids = []
-for str_id in str_ids:
-    gid = int(str_id)
-    if gid >= 0:
-        gpu_ids.append(gid)
+if opt.gpu_ids:
+    str_ids = opt.gpu_ids.split(',')
+    for str_id in str_ids:
+        gid = int(str_id)
+        if gid >= 0:
+            gpu_ids.append(gid)
 
 # set gpu ids
 if len(gpu_ids) > 0:
