@@ -118,10 +118,14 @@ if opt.gpu_ids:
         if gid >= 0:
             gpu_ids.append(gid)
 
-# set gpu ids
-if len(gpu_ids) > 0:
+use_gpu = torch.cuda.is_available()
+if not use_gpu or len(gpu_ids) == 0:
+    print("Running on CPU ...")
+else:
+    print("Running on cuda:{}".format(gpu_ids[0]))
     torch.cuda.set_device(gpu_ids[0])
     cudnn.benchmark = True
+
 ######################################################################
 # Load Data
 # ---------
@@ -197,8 +201,6 @@ dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=opt.
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
 class_names = image_datasets['train'].classes
 opt.nclasses = len(class_names)
-
-use_gpu = torch.cuda.is_available()
 
 since = time.time()
 inputs, classes = next(iter(dataloaders['train']))
