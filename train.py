@@ -480,7 +480,7 @@ model = model.cuda()
 if fp16:
     model = model.half()
 
-optim_name = optim.SGD  # apex.optimizers.FusedSGD
+optim_name = optim.SGD
 
 if not opt.PCB:
     ignored_params = list(map(id, model.classifier.parameters()))
@@ -511,9 +511,8 @@ else:
         {'params': classifier_params, 'lr': opt.lr}
     ], weight_decay=5e-4, momentum=0.9, nesterov=True)
 
-# Decay LR by a factor of 0.1 every 40 epochs
 exp_lr_scheduler = lr_scheduler.StepLR(
-    optimizer_ft, step_size=opt.total_epoch * 2 // 3, gamma=0.1)
+    optimizer_ft, step_size=10, gamma=0.1, last_epoch=opt.start_epoch - 1)
 if opt.cosine:
     exp_lr_scheduler = lr_scheduler.CosineAnnealingLR(
         optimizer_ft, opt.total_epoch, eta_min=0.01 * opt.lr)
