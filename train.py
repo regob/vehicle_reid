@@ -463,7 +463,6 @@ model = load_model_from_opts(opts_file,
                              ckpt=opt.checkpoint if opt.checkpoint else None,
                              return_feature=return_feature)
 
-print(model)
 model.train()
 
 
@@ -488,8 +487,10 @@ if not opt.PCB:
         p) not in ignored_params, model.parameters())
     classifier_params = model.classifier.parameters()
     optimizer_ft = optim_name([
-        {'params': base_params, 'lr': 0.1 * opt.lr},
-        {'params': classifier_params, 'lr': opt.lr}
+        {'params': base_params, 'initial_lr': 0.1 * opt.lr,
+         'lr': 0.1 * opt.lr},
+        {'params': classifier_params, 'initial_lr': opt.lr,
+         'lr': opt.lr},
     ], weight_decay=5e-4, momentum=0.9, nesterov=True)
 else:
     ignored_params = list(map(id, model.model.fc.parameters()))
