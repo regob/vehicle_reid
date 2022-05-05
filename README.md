@@ -26,6 +26,7 @@ Models are trained on VeRi-Wild, VehicleX-SPGAN, and Zala datasets.
 |---|---|---|---|
 | Resnet50-ibn + contrastive | VeRi-Wild | 0.998| 0.359 | 
 | Resnet50-ibn + contrastive | VeRi-Wild + Zala | 0.995 | 0.408 |
+| Resnet50-ibn + contrastive | VeRi-Wild + Zala + VehicleX | 0.998 |0.437 |
 
 ### Zala test
 Private test data with 100 ids.
@@ -34,6 +35,8 @@ Private test data with 100 ids.
 |---|---|---|---|
 | Resnet50-ibn + contrastive | VeRi-Wild | 0.980| 0.706 |
 | Resnet50-ibn + contrastive | VeRi-Wild + Zala | 0.994 | 0.904 |
+| Resnet50-ibn + contrastive | VeRi-Wild + Zala + VehicleX |0.994 |0.9032 |
+
 
 
 ## Citation
