@@ -407,7 +407,6 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                     loss = criterion(outputs, labels)
 
                 # del inputs # why?
-                print(loss)
 
                 # backward + optimize only if in training phase
                 if epoch < opt.warm_epoch and phase == 'train':
@@ -499,9 +498,9 @@ def draw_curve(current_epoch):
 def save_network(network, epoch_label):
     save_filename = 'net_%s.pth' % epoch_label
     save_path = os.path.join(SCRIPT_DIR, "model", name, save_filename)
+    device = network.device
     torch.save(network.cpu().state_dict(), save_path)
-    if torch.cuda.is_available():
-        network.cuda(gpu_ids[0])
+    network.to(device)
 
 
 ######################################################################
