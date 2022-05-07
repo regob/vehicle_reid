@@ -15,7 +15,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 from load_model import load_model_from_opts
-from tools.dataset import ImageDataset
+from dataset import ImageDataset
 
 ######################################################################
 # Options

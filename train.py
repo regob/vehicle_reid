@@ -22,6 +22,16 @@ from shutil import copyfile
 import pandas as pd
 import tqdm
 
+from pytorch_metric_learning import losses, miners
+
+try:
+    import torch_xla
+    import torch_xla.core.xla_model as xm
+    import torch_xla.distributed.xla_multiprocessing as xmp
+    import torch_xla.distributed.parallel_loader as pl
+except ImportError:
+    print("WARNING: torch_xla not installed, TPU training and the --tpu_cores argument wont work")
+
 version = torch.__version__
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -31,11 +41,8 @@ from random_erasing import RandomErasing
 from circle_loss import CircleLoss, convert_label_to_similarity
 from instance_loss import InstanceLoss
 from load_model import load_model_from_opts
+from dataset import ImageDataset
 
-
-# pip install pytorch-metric-learning
-from pytorch_metric_learning import losses, miners
-from tools.dataset import ImageDataset
 
 ######################################################################
 # Options
@@ -43,6 +50,8 @@ from tools.dataset import ImageDataset
 parser = argparse.ArgumentParser(description='Training')
 parser.add_argument('--gpu_ids', default='0', type=str,
                     help='gpu_ids: e.g. 0  0,1,2  0,2')
+parser.add_argument('--tpu_cores', default=-1, type=int,
+                    help="use TPU instead of GPU, with the provided number of cores.")
 parser.add_argument('--name', default='ft_ResNet50',
                     type=str, help='output model name')
 parser.add_argument('--data_dir', default='../../datasets/',
@@ -106,25 +115,35 @@ parser.add_argument("--start_epoch", default=0, type=int,
                     help="Epoch to continue training from.")
 opt = parser.parse_args()
 
+######################################################################
+# Configure devices
+# ---------
+#
+
 fp16 = opt.fp16
 data_dir = opt.data_dir
 name = opt.name
 
-gpu_ids = []
-if opt.gpu_ids:
-    str_ids = opt.gpu_ids.split(',')
-    for str_id in str_ids:
-        gid = int(str_id)
-        if gid >= 0:
-            gpu_ids.append(gid)
-
-use_gpu = torch.cuda.is_available()
-if not use_gpu or len(gpu_ids) == 0:
-    print("Running on CPU ...")
+if opt.tpu_cores > 0:
+    use_tpu, use_gpu = True, False
+    print("Running on TPU ({} cores)".format(opt.tpu_cores))
 else:
-    print("Running on cuda:{}".format(gpu_ids[0]))
-    torch.cuda.set_device(gpu_ids[0])
-    cudnn.benchmark = True
+    gpu_ids = []
+    if opt.gpu_ids:
+        str_ids = opt.gpu_ids.split(',')
+        for str_id in str_ids:
+            gid = int(str_id)
+            if gid >= 0:
+                gpu_ids.append(gid)
+
+    use_tpu = False
+    use_gpu = torch.cuda.is_available()
+    if not use_gpu or len(gpu_ids) == 0:
+        print("Running on CPU ...")
+    else:
+        print("Running on cuda:{}".format(gpu_ids[0]))
+        torch.cuda.set_device(gpu_ids[0])
+        cudnn.benchmark = True
 
 ######################################################################
 # Load Data
@@ -148,19 +167,6 @@ transform_val_list = [
     transforms.ToTensor(),
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ]
-
-if opt.PCB:
-    transform_train_list = [
-        transforms.Resize((384, 192), interpolation=3),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ]
-    transform_val_list = [
-        transforms.Resize(size=(384, 192), interpolation=3),  # Image.BICUBIC
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ]
 
 if opt.erasing_p > 0:
     transform_train_list = transform_train_list + \
@@ -192,19 +198,11 @@ else:
         opt.data_dir, val_df, "id", classes=all_ids, transform=data_transforms["val"])
 
 
-# 8 workers may work faster
-dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=opt.batchsize,
-                                              shuffle=True, num_workers=2, pin_memory=True)
-               for x in ['train', 'val']}
-
-
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
 class_names = image_datasets['train'].classes
 opt.nclasses = len(class_names)
+print("Number of classes in total: {}".format(opt.nclasses))
 
-since = time.time()
-inputs, classes = next(iter(dataloaders['train']))
-print(f"Loading a sample batch took: {time.time() - since} seconds.")
 ######################################################################
 # Training the model
 # ------------------
@@ -229,19 +227,49 @@ y_err['val'] = []
 def fliplr(img):
     '''flip horizontal'''
     inv_idx = torch.arange(img.size(3) - 1, -1, -
-                           1).long().cuda()  # N x C x H x W
+                           1).long().to(img.device)
     img_flip = img.index_select(3, inv_idx)
     return img_flip
 
 
-def train_model(model, criterion, optimizer, scheduler, start_epoch=0, num_epochs=25):
+def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
     since = time.time()
 
-    # best_model_wts = model.state_dict()
-    # best_acc = 0.0
+    if use_tpu:
+        device = xm.xla_device()
+    elif use_gpu:
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
+
+    model = model.to(device)
+    if fp16:
+        model = model.half()
+
+    # create optimizer and scheduler
+    optim_name = optim.SGD
+    ignored_params = list(map(id, model.classifier.parameters()))
+    base_params = filter(lambda p: id(
+        p) not in ignored_params, model.parameters())
+    classifier_params = model.classifier.parameters()
+    optimizer = optim_name([
+        {'params': base_params, 'initial_lr': 0.1 * opt.lr,
+         'lr': 0.1 * opt.lr},
+        {'params': classifier_params, 'initial_lr': opt.lr,
+         'lr': opt.lr},
+    ], weight_decay=5e-4, momentum=0.9, nesterov=True)
+
+    scheduler = lr_scheduler.StepLR(
+        optimizer, step_size=10, gamma=0.1, last_epoch=opt.start_epoch - 1)
+    if opt.cosine:
+        scheduler = lr_scheduler.CosineAnnealingLR(
+            optimizer, opt.total_epoch, eta_min=0.01 * opt.lr)
+
     warm_up = 0.1  # We start from the 0.1*lrRate
     warm_iteration = round(
         dataset_sizes['train'] / opt.batchsize) * opt.warm_epoch
+
+    # initialize losses
     if opt.arcface:
         criterion_arcface = losses.ArcFaceLoss(
             num_classes=opt.nclasses, embedding_size=512)
@@ -264,12 +292,42 @@ def train_model(model, criterion, optimizer, scheduler, start_epoch=0, num_epoch
     if opt.sphere:
         criterion_sphere = losses.SphereFaceLoss(
             num_classes=opt.nclasses, embedding_size=512, margin=4)
+
+    if use_tpu:
+        data_samplers = {
+            x: torch.utils.data.distributed.DistributedSampler(
+                image_datasets[x],
+                num_replicas=xm.xrt_world_size(),
+                rank=xm.get_ordinal(),
+                shuffle=(x == "train"))
+            for x in ["train", "val"]
+        }
+    else:
+        data_samplers = {x: None for x in ["train", "val"]}
+
+    dataloaders = {
+        x: torch.utils.data.DataLoader(image_datasets[x],
+                                       batch_size=opt.batchsize,
+                                       sampler=data_samplers[x],
+                                       shuffle=(x == "train"),
+                                       num_workers=num_workers,
+                                       drop_last=True)
+        # pin_memory=True)
+        for x in ['train', 'val']
+    }
+
     for epoch in range(start_epoch, num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
 
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
+            if use_tpu:
+                loader = pl.ParallelLoader(
+                    dataloaders[phase], [device]).per_device_loader(device)
+            else:
+                loader = dataloaders[phase]
+
             if phase == 'train':
                 model.train(True)  # Set model to training mode
             else:
@@ -277,20 +335,15 @@ def train_model(model, criterion, optimizer, scheduler, start_epoch=0, num_epoch
 
             running_loss = 0.0
             running_corrects = 0.0
-            # Iterate over data.
-            for data in tqdm.tqdm(dataloaders[phase]):
+
+            for data in tqdm.tqdm(loader):
                 # get the inputs
                 inputs, labels = data
                 now_batch_size, c, h, w = inputs.shape
-                if now_batch_size < opt.batchsize:  # skip the last batch
-                    continue
-                # print(inputs.shape)
-                # wrap them in Variable
+
                 if use_gpu:
-                    inputs = Variable(inputs.cuda().detach())
-                    labels = Variable(labels.cuda().detach())
-                else:
-                    inputs, labels = Variable(inputs), Variable(labels)
+                    inputs, labels = inputs.to(device), labels.to(device)
+
                 # if we use low precision, input also need to be fp16
                 if fp16:
                     inputs = inputs.half()
@@ -351,7 +404,8 @@ def train_model(model, criterion, optimizer, scheduler, start_epoch=0, num_epoch
                     _, preds = torch.max(outputs.data, 1)
                     loss = criterion(outputs, labels)
 
-                del inputs
+                # del inputs # why?
+                print(loss)
 
                 # backward + optimize only if in training phase
                 if epoch < opt.warm_epoch and phase == 'train':
@@ -359,14 +413,12 @@ def train_model(model, criterion, optimizer, scheduler, start_epoch=0, num_epoch
                     loss = loss * warm_up
 
                 if phase == 'train':
-                    if fp16:  # we use optimier to backward loss
-                        # with amp.scale_loss(loss, optimizer) as scaled_loss:
-                        loss.backward()
+                    loss.backward()
+                    if use_tpu:
+                        xm.optimizer_step(optimizer)
                     else:
-                        loss.backward()
-                    optimizer.step()
-                # statistics
-                # for the new version like 0.4.0, 0.5.0 and 1.0.0
+                        optimizer.step()
+
                 if int(version[0]) > 0 or int(version[2]) > 3:
                     running_loss += loss.item() * now_batch_size
                 else:  # for the old version like 0.3.0 and 0.3.1
@@ -382,12 +434,12 @@ def train_model(model, criterion, optimizer, scheduler, start_epoch=0, num_epoch
 
             y_loss[phase].append(epoch_loss)
             y_err[phase].append(1.0 - epoch_acc)
-            # deep copy the model
+
             if phase == 'val':
-                last_model_wts = model.state_dict()
-                if epoch % (opt.save_freq) == (opt.save_freq - 1):
-                    save_network(model, epoch)
-                draw_curve(epoch)
+                if not use_tpu or xm.is_master_ordinal():
+                    if epoch == num_epochs - 1 or (epoch % (opt.save_freq) == (opt.save_freq - 1)):
+                        save_network(model, epoch)
+                    draw_curve(epoch)
             if phase == 'train':
                 scheduler.step()
         time_elapsed = time.time() - since
@@ -398,12 +450,16 @@ def train_model(model, criterion, optimizer, scheduler, start_epoch=0, num_epoch
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(
         time_elapsed // 60, time_elapsed % 60))
-    # print('Best val Acc: {:4f}'.format(best_acc))
-
-    # load best model weights
-    model.load_state_dict(last_model_wts)
-    save_network(model, 'last')
     return model
+
+
+def tpu_map_fn(index, flags):
+    """ Thread initialization function for TPU processes """
+
+    torch.manual_seed(flags["seed"])
+    criterion = nn.CrossEntropyLoss()
+    train_model(model, criterion, opt.start_epoch, opt.total_epoch,
+                num_workers=flags["num_workers"])
 
 
 ######################################################################
@@ -462,70 +518,24 @@ return_feature = opt.arcface or opt.cosface or opt.circle or opt.triplet or opt.
 model = load_model_from_opts(opts_file,
                              ckpt=opt.checkpoint if opt.checkpoint else None,
                              return_feature=return_feature)
-
+# model is on CPU at this point, we send it to the device in the training function
 model.train()
 
-
-######################################################################
-# Finetuning the convnet
-# ----------------------
-#
-# Load a pretrainied model and reset final fully connected layer.
-#
-
-
-# model to gpu
-model = model.cuda()
-if fp16:
-    model = model.half()
-
-optim_name = optim.SGD
-
-if not opt.PCB:
-    ignored_params = list(map(id, model.classifier.parameters()))
-    base_params = filter(lambda p: id(
-        p) not in ignored_params, model.parameters())
-    classifier_params = model.classifier.parameters()
-    optimizer_ft = optim_name([
-        {'params': base_params, 'initial_lr': 0.1 * opt.lr,
-         'lr': 0.1 * opt.lr},
-        {'params': classifier_params, 'initial_lr': opt.lr,
-         'lr': opt.lr},
-    ], weight_decay=5e-4, momentum=0.9, nesterov=True)
-else:
-    ignored_params = list(map(id, model.model.fc.parameters()))
-    ignored_params += (list(map(id, model.classifier0.parameters()))
-                       + list(map(id, model.classifier1.parameters()))
-                       + list(map(id, model.classifier2.parameters()))
-                       + list(map(id, model.classifier3.parameters()))
-                       + list(map(id, model.classifier4.parameters()))
-                       + list(map(id, model.classifier5.parameters()))
-                       # +list(map(id, model.classifier6.parameters() ))
-                       # +list(map(id, model.classifier7.parameters() ))
-                       )
-    base_params = filter(lambda p: id(
-        p) not in ignored_params, model.parameters())
-    classifier_params = filter(lambda p: id(
-        p) in ignored_params, model.parameters())
-    optimizer_ft = optim_name([
-        {'params': base_params, 'lr': 0.1 * opt.lr},
-        {'params': classifier_params, 'lr': opt.lr}
-    ], weight_decay=5e-4, momentum=0.9, nesterov=True)
-
-exp_lr_scheduler = lr_scheduler.StepLR(
-    optimizer_ft, step_size=10, gamma=0.1, last_epoch=opt.start_epoch - 1)
-if opt.cosine:
-    exp_lr_scheduler = lr_scheduler.CosineAnnealingLR(
-        optimizer_ft, opt.total_epoch, eta_min=0.01 * opt.lr)
 
 ######################################################################
 # Train and evaluate
 # ^^^^^^^^^^^^^^^^^^
 #
-# It should take around 1-2 hours on GPU.
 #
 
-criterion = nn.CrossEntropyLoss()
+if use_tpu:
+    flags = {
+        "seed": 1234,
+        "num_workers": 2,
+    }
+    xmp.spawn(tpu_map_fn, args=(flags, ), nprocs=opt.tpu_cores,
+              start_method="fork")
 
-model = train_model(model, criterion, optimizer_ft, exp_lr_scheduler,
-                    start_epoch=opt.start_epoch, num_epochs=opt.total_epoch)
+criterion = nn.CrossEntropyLoss()
+model = train_model(
+    model, criterion, start_epoch=opt.start_epoch, num_epochs=opt.total_epoch)
