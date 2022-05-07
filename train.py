@@ -51,7 +51,7 @@ parser = argparse.ArgumentParser(description='Training')
 parser.add_argument('--gpu_ids', default='0', type=str,
                     help='gpu_ids: e.g. 0  0,1,2  0,2')
 parser.add_argument('--tpu_cores', default=-1, type=int,
-                    help="use TPU instead of GPU, with the provided number of cores.")
+                    help="use TPU instead of GPU with the given number of cores (1 recommended if not too many cpus")
 parser.add_argument('--name', default='ft_ResNet50',
                     type=str, help='output model name')
 parser.add_argument('--data_dir', default='../../datasets/',
@@ -128,7 +128,7 @@ name = opt.name
 
 if opt.tpu_cores > 0:
     use_tpu, use_gpu = True, False
-    print("Running on TPU ({} cores)".format(opt.tpu_cores))
+    print("Running on TPU ...")
 else:
     gpu_ids = []
     if opt.gpu_ids:
@@ -295,7 +295,7 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
         criterion_sphere = losses.SphereFaceLoss(
             num_classes=opt.nclasses, embedding_size=512, margin=4)
 
-    if use_tpu:
+    if use_tpu and opt.tpu_cores > 1:
         data_samplers = {
             x: torch.utils.data.distributed.DistributedSampler(
                 image_datasets[x],
@@ -313,8 +313,8 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                                        batch_size=opt.batchsize,
                                        sampler=data_samplers[x],
                                        num_workers=num_workers,
-                                       drop_last=True)
-        # pin_memory=True)
+                                       drop_last=True,
+                                       pin_memory=True)
         for x in ['train', 'val']
     }
 
@@ -324,11 +324,11 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
 
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
-            if use_tpu:
+            if use_tpu and opt.tpu_cores > 1:
                 loader = pl.ParallelLoader(
                     dataloaders[phase], [device]).per_device_loader(device)
             else:
-                loader = dataloaders[phase]
+                loader = tqdm.tqdm(dataloaders[phase])
 
             if phase == 'train':
                 model.train(True)  # Set model to training mode
@@ -338,12 +338,12 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
             running_loss = 0.0
             running_corrects = 0.0
 
-            for data in tqdm.tqdm(loader):
+            for data in loader:
                 # get the inputs
                 inputs, labels = data
                 now_batch_size, c, h, w = inputs.shape
 
-                if use_gpu:
+                if use_gpu or (use_tpu and opt.tpu_cores == 1):
                     inputs, labels = inputs.to(device), labels.to(device)
 
                 # if we use low precision, input also need to be fp16
@@ -406,7 +406,7 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                     _, preds = torch.max(outputs.data, 1)
                     loss = criterion(outputs, labels)
 
-                # del inputs # why?
+                del inputs  # why?
 
                 # backward + optimize only if in training phase
                 if epoch < opt.warm_epoch and phase == 'train':
@@ -419,7 +419,7 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                     torch.nn.utils.clip_grad_norm_(
                         model.parameters(), opt.grad_clip_max_norm)
                     if use_tpu:
-                        xm.optimizer_step(optimizer)
+                        xm.optimizer_step(optimizer, barrier=True)
                     else:
                         optimizer.step()
 
@@ -440,18 +440,18 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
             y_err[phase].append(1.0 - epoch_acc)
 
             if phase == 'val':
-                if not use_tpu or xm.is_master_ordinal():
+                if not use_tpu or opt.tpu_cores == 1 or xm.is_master_ordinal():
                     if epoch == num_epochs - 1 or (epoch % (opt.save_freq) == (opt.save_freq - 1)):
                         save_network(model, epoch)
                     draw_curve(epoch)
             if phase == 'train':
                 scheduler.step()
 
-            if use_tpu:
-                xm.rendezvous('download_only_once')
+            if use_tpu and opt.tpu_cores > 1:
+                xm.rendezvous('wait all threads here, not sure if needed')
 
         time_elapsed = time.time() - since
-        print('Training complete in {:.0f}m {:.0f}s'.format(
+        print('Epoch complete at {:.0f}m {:.0f}s'.format(
             time_elapsed // 60, time_elapsed % 60))
         print()
 
@@ -536,14 +536,14 @@ model.train()
 #
 #
 
-if use_tpu:
+if use_tpu and opt.tpu_cores > 1:
     flags = {
         "seed": 1234,
         "num_workers": 4,
     }
     xmp.spawn(tpu_map_fn, args=(flags, ), nprocs=opt.tpu_cores,
               start_method="fork")
-
-criterion = nn.CrossEntropyLoss()
-model = train_model(
-    model, criterion, start_epoch=opt.start_epoch, num_epochs=opt.total_epoch)
+else:
+    criterion = nn.CrossEntropyLoss()
+    model = train_model(
+        model, criterion, start_epoch=opt.start_epoch, num_epochs=opt.total_epoch)
