@@ -103,6 +103,8 @@ parser.add_argument('--sphere', action='store_true',
 parser.add_argument('--ibn', action='store_true', help='use resnet+ibn')
 parser.add_argument('--fp16', action='store_true',
                     help='use float16 instead of float32, which will save about 50 percent memory')
+parser.add_argument("--grad_clip_max_norm", type=float, default=5.0,
+                    help="maximum norm of gradient to be clipped to")
 parser.add_argument('--cosine', action='store_true',
                     help='use cosine lrRate')
 parser.add_argument("--train_csv_path", default="", type=str)
@@ -405,7 +407,6 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                     loss = criterion(outputs, labels)
 
                 # del inputs # why?
-                print(loss)
 
                 # backward + optimize only if in training phase
                 if epoch < opt.warm_epoch and phase == 'train':
@@ -414,6 +415,9 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
 
                 if phase == 'train':
                     loss.backward()
+                    # perform gradient clipping to prevent divergence
+                    torch.nn.utils.clip_grad_norm_(
+                        model.parameters(), opt.grad_clip_max_norm)
                     if use_tpu:
                         xm.optimizer_step(optimizer)
                     else:
