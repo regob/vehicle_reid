@@ -312,7 +312,6 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
         x: torch.utils.data.DataLoader(image_datasets[x],
                                        batch_size=opt.batchsize,
                                        sampler=data_samplers[x],
-                                       shuffle=(x == "train"),
                                        num_workers=num_workers,
                                        drop_last=True)
         # pin_memory=True)
