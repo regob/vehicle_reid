@@ -447,6 +447,10 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                     draw_curve(epoch)
             if phase == 'train':
                 scheduler.step()
+
+            if use_tpu:
+                xm.rendezvous('download_only_once')
+
         time_elapsed = time.time() - since
         print('Training complete in {:.0f}m {:.0f}s'.format(
             time_elapsed // 60, time_elapsed % 60))
@@ -536,7 +540,7 @@ model.train()
 if use_tpu:
     flags = {
         "seed": 1234,
-        "num_workers": 2,
+        "num_workers": 4,
     }
     xmp.spawn(tpu_map_fn, args=(flags, ), nprocs=opt.tpu_cores,
               start_method="fork")
