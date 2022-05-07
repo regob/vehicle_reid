@@ -301,17 +301,16 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                 image_datasets[x],
                 num_replicas=xm.xrt_world_size(),
                 rank=xm.get_ordinal(),
-                shuffle=(x == "train"))
+                shuffle=(x == "train"),
             for x in ["train", "val"]
         }
     else:
-        data_samplers = {x: None for x in ["train", "val"]}
+        data_samplers={x: None for x in ["train", "val"]}
 
-    dataloaders = {
+    dataloaders={
         x: torch.utils.data.DataLoader(image_datasets[x],
                                        batch_size=opt.batchsize,
                                        sampler=data_samplers[x],
-                                       shuffle=(x == "train"),
                                        num_workers=num_workers,
                                        drop_last=True)
         # pin_memory=True)
@@ -325,30 +324,30 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
             if use_tpu:
-                loader = pl.ParallelLoader(
+                loader=pl.ParallelLoader(
                     dataloaders[phase], [device]).per_device_loader(device)
             else:
-                loader = dataloaders[phase]
+                loader=dataloaders[phase]
 
             if phase == 'train':
                 model.train(True)  # Set model to training mode
             else:
                 model.train(False)  # Set model to evaluate mode
 
-            running_loss = 0.0
-            running_corrects = 0.0
+            running_loss=0.0
+            running_corrects=0.0
 
             for data in tqdm.tqdm(loader):
                 # get the inputs
-                inputs, labels = data
-                now_batch_size, c, h, w = inputs.shape
+                inputs, labels=data
+                now_batch_size, c, h, w=inputs.shape
 
                 if use_gpu:
-                    inputs, labels = inputs.to(device), labels.to(device)
+                    inputs, labels=inputs.to(device), labels.to(device)
 
                 # if we use low precision, input also need to be fp16
                 if fp16:
-                    inputs = inputs.half()
+                    inputs=inputs.half()
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
@@ -356,19 +355,19 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                 # forward
                 if phase == 'val':
                     with torch.no_grad():
-                        outputs = model(inputs)
+                        outputs=model(inputs)
                 else:
-                    outputs = model(inputs)
+                    outputs=model(inputs)
 
-                sm = nn.Softmax(dim=1)
-                log_sm = nn.LogSoftmax(dim=1)
-                return_feature = opt.arcface or opt.cosface or opt.circle or opt.triplet or opt.contrast or opt.instance or opt.lifted or opt.sphere
+                sm=nn.Softmax(dim=1)
+                log_sm=nn.LogSoftmax(dim=1)
+                return_feature=opt.arcface or opt.cosface or opt.circle or opt.triplet or opt.contrast or opt.instance or opt.lifted or opt.sphere
                 if return_feature:
-                    logits, ff = outputs
-                    fnorm = torch.norm(ff, p=2, dim=1, keepdim=True)
-                    ff = ff.div(fnorm.expand_as(ff))
-                    loss = criterion(logits, labels)
-                    _, preds = torch.max(logits.data, 1)
+                    logits, ff=outputs
+                    fnorm=torch.norm(ff, p=2, dim=1, keepdim=True)
+                    ff=ff.div(fnorm.expand_as(ff))
+                    loss=criterion(logits, labels)
+                    _, preds=torch.max(logits.data, 1)
                     if opt.arcface:
                         loss += criterion_arcface(ff, labels) / now_batch_size
                     if opt.cosface:
@@ -377,7 +376,7 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                         loss += criterion_circle(
                             *convert_label_to_similarity(ff, labels)) / now_batch_size
                     if opt.triplet:
-                        hard_pairs = miner(ff, labels)
+                        hard_pairs=miner(ff, labels)
                         # /now_batch_size
                         loss += criterion_triplet(ff, labels, hard_pairs)
                     if opt.lifted:
@@ -390,28 +389,28 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                     if opt.sphere:
                         loss += criterion_sphere(ff, labels) / now_batch_size
                 elif opt.PCB:  # PCB
-                    part = {}
-                    num_part = 6
+                    part={}
+                    num_part=6
                     for i in range(num_part):
-                        part[i] = outputs[i]
+                        part[i]=outputs[i]
 
-                    score = sm(part[0]) + sm(part[1]) + sm(part[2]) + \
+                    score=sm(part[0]) + sm(part[1]) + sm(part[2]) + \
                         sm(part[3]) + sm(part[4]) + sm(part[5])
-                    _, preds = torch.max(score.data, 1)
+                    _, preds=torch.max(score.data, 1)
 
-                    loss = criterion(part[0], labels)
+                    loss=criterion(part[0], labels)
                     for i in range(num_part - 1):
                         loss += criterion(part[i + 1], labels)
                 else:  # norm
-                    _, preds = torch.max(outputs.data, 1)
-                    loss = criterion(outputs, labels)
+                    _, preds=torch.max(outputs.data, 1)
+                    loss=criterion(outputs, labels)
 
                 # del inputs # why?
 
                 # backward + optimize only if in training phase
                 if epoch < opt.warm_epoch and phase == 'train':
-                    warm_up = min(1.0, warm_up + 0.9 / warm_iteration)
-                    loss = loss * warm_up
+                    warm_up=min(1.0, warm_up + 0.9 / warm_iteration)
+                    loss=loss * warm_up
 
                 if phase == 'train':
                     loss.backward()
@@ -430,8 +429,8 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                 del loss
                 running_corrects += float(torch.sum(preds == labels.data))
 
-            epoch_loss = running_loss / dataset_sizes[phase]
-            epoch_acc = running_corrects / dataset_sizes[phase]
+            epoch_loss=running_loss / dataset_sizes[phase]
+            epoch_acc=running_corrects / dataset_sizes[phase]
 
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(
                 phase, epoch_loss, epoch_acc))
@@ -446,12 +445,12 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                     draw_curve(epoch)
             if phase == 'train':
                 scheduler.step()
-        time_elapsed = time.time() - since
+        time_elapsed=time.time() - since
         print('Training complete in {:.0f}m {:.0f}s'.format(
             time_elapsed // 60, time_elapsed % 60))
         print()
 
-    time_elapsed = time.time() - since
+    time_elapsed=time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(
         time_elapsed // 60, time_elapsed % 60))
     return model
@@ -461,7 +460,7 @@ def tpu_map_fn(index, flags):
     """ Thread initialization function for TPU processes """
 
     torch.manual_seed(flags["seed"])
-    criterion = nn.CrossEntropyLoss()
+    criterion=nn.CrossEntropyLoss()
     train_model(model, criterion, opt.start_epoch, opt.total_epoch,
                 num_workers=flags["num_workers"])
 
@@ -469,10 +468,10 @@ def tpu_map_fn(index, flags):
 ######################################################################
 # Draw Curve
 # ---------------------------
-x_epoch = []
-fig = plt.figure()
-ax0 = fig.add_subplot(121, title="loss")
-ax1 = fig.add_subplot(122, title="top1err")
+x_epoch=[]
+fig=plt.figure()
+ax0=fig.add_subplot(121, title="loss")
+ax1=fig.add_subplot(122, title="top1err")
 
 
 def draw_curve(current_epoch):
@@ -492,8 +491,8 @@ def draw_curve(current_epoch):
 
 
 def save_network(network, epoch_label):
-    save_filename = 'net_%s.pth' % epoch_label
-    save_path = os.path.join(SCRIPT_DIR, "model", name, save_filename)
+    save_filename='net_%s.pth' % epoch_label
+    save_path=os.path.join(SCRIPT_DIR, "model", name, save_filename)
     torch.save(network.cpu().state_dict(), save_path)
     if torch.cuda.is_available():
         network.cuda(gpu_ids[0])
@@ -503,7 +502,7 @@ def save_network(network, epoch_label):
 # Save opts and load model
 # ----------------------
 
-dir_name = os.path.join(SCRIPT_DIR, "model", name)
+dir_name=os.path.join(SCRIPT_DIR, "model", name)
 if not os.path.isdir(dir_name):
     os.mkdir(dir_name)
 # record every run
@@ -513,13 +512,13 @@ copyfile(os.path.join(SCRIPT_DIR, "model.py"),
          os.path.join(dir_name, "model.py"))
 
 # save opts
-opts_file = "%s/opts.yaml" % dir_name
+opts_file="%s/opts.yaml" % dir_name
 with open(opts_file, 'w') as fp:
     yaml.dump(vars(opt), fp, default_flow_style=False)
 
-return_feature = opt.arcface or opt.cosface or opt.circle or opt.triplet or opt.contrast or opt.instance or opt.lifted or opt.sphere
+return_feature=opt.arcface or opt.cosface or opt.circle or opt.triplet or opt.contrast or opt.instance or opt.lifted or opt.sphere
 
-model = load_model_from_opts(opts_file,
+model=load_model_from_opts(opts_file,
                              ckpt=opt.checkpoint if opt.checkpoint else None,
                              return_feature=return_feature)
 # model is on CPU at this point, we send it to the device in the training function
