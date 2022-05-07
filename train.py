@@ -498,7 +498,7 @@ def draw_curve(current_epoch):
 def save_network(network, epoch_label):
     save_filename = 'net_%s.pth' % epoch_label
     save_path = os.path.join(SCRIPT_DIR, "model", name, save_filename)
-    device = network.device
+    device = next(iter(network.parameters())).device
     torch.save(network.cpu().state_dict(), save_path)
     network.to(device)
 
