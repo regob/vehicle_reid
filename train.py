@@ -363,8 +363,6 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                 else:
                     outputs = model(inputs)
 
-                sm = nn.Softmax(dim=1).to(device)
-                log_sm = nn.LogSoftmax(dim=1).to(device)
                 return_feature = opt.arcface or opt.cosface or opt.circle or opt.triplet or opt.contrast or opt.instance or opt.lifted or opt.sphere
                 if return_feature:
                     logits, ff = outputs
@@ -392,20 +390,7 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                         loss += criterion_instance(ff, labels) / now_batch_size
                     if opt.sphere:
                         loss += criterion_sphere(ff, labels) / now_batch_size
-                elif opt.PCB:  # PCB
-                    part = {}
-                    num_part = 6
-                    for i in range(num_part):
-                        part[i] = outputs[i]
-
-                    score = sm(part[0]) + sm(part[1]) + sm(part[2]) + \
-                        sm(part[3]) + sm(part[4]) + sm(part[5])
-                    _, preds = torch.max(score.data, 1)
-
-                    loss = criterion(part[0], labels)
-                    for i in range(num_part - 1):
-                        loss += criterion(part[i + 1], labels)
-                else:  # norm
+                else:
                     _, preds = torch.max(outputs.data, 1)
                     loss = criterion(outputs, labels)
 
@@ -437,7 +422,7 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
             epoch_acc = running_corrects / dataset_sizes[phase]
 
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(
-                phase, epoch_loss, epoch_acc))
+                phase, epoch_loss.item(), epoch_acc.item()))
 
             y_loss[phase].append(epoch_loss)
             y_err[phase].append(1.0 - epoch_acc)
