@@ -174,26 +174,32 @@ class ft_net_dense(nn.Module):
 
 class ft_net_efficient(nn.Module):
 
-    def __init__(self, class_num, droprate=0.5, circle=False, linear_num=512):
+    def __init__(self, class_num, droprate=0.5, circle=False, linear_num=512, model_subtype="b4"):
         super().__init__()
-        #model_ft = timm.create_model('tf_efficientnet_b4', pretrained=True)
         try:
             from efficientnet_pytorch import EfficientNet
         except ImportError:
             print('Please pip install efficientnet_pytorch')
-        model_ft = EfficientNet.from_pretrained('efficientnet-b4')
-        # avg pooling to global pooling
-        #model_ft.avgpool = nn.AdaptiveAvgPool2d((1,1))
-        model_ft.head = nn.Sequential()  # save memory
+
+        if model_subtype == "default":
+            model_subtype = "b4"
+        subtype_int = int(model_subtype[-1])
+
+        # For EfficientNet, the feature dim is not fixed
+        out_channels_by_type = [1280, 1280, 1408,
+                                1536, 1792, 2048, 2304, 2560, 2816]
+
+        model_ft = EfficientNet.from_pretrained(
+            'efficientnet-{}'.format(model_subtype))
+
+        model_ft.head = nn.Sequential()
         model_ft.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         model_ft.classifier = nn.Sequential()
         self.model = model_ft
         self.circle = circle
-        # For EfficientNet, the feature dim is not fixed
-        # for efficientnet_b2 1408
-        # for efficientnet_b4 1792
+
         self.classifier = ClassBlock(
-            1792, class_num, droprate, linear=linear_num, return_f=circle)
+            out_channels_by_type[subtype_int], class_num, droprate, linear=linear_num, return_f=circle)
 
     def forward(self, x):
         #x = self.model.forward_features(x)

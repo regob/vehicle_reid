@@ -115,6 +115,8 @@ parser.add_argument("--checkpoint", default="", type=str,
                     help="Model checkpoint to load.")
 parser.add_argument("--start_epoch", default=0, type=int,
                     help="Epoch to continue training from.")
+parser.add_argument("--model_subtype", default="default",
+                    help="Subtype for each model (b0 to b7 for efficientnet, etc.)")
 opt = parser.parse_args()
 
 ######################################################################

@@ -51,13 +51,14 @@ def load_model_from_opts(opts_file, ckpt=None, return_feature=False, remove_clas
     droprate = opts["droprate"]
     stride = opts["stride"]
     linear_num = opts["linear_num"]
+    model_subtype = "default" if "model_subtype" not in opts else opts["model_subtype"]
 
     if opts["use_dense"]:
         model = create_model(n_classes, "densenet", droprate=droprate, circle=return_feature,
                              linear_num=linear_num)
     elif opts["use_efficient"]:
         model = create_model(n_classes, "efficientnet", droprate=droprate,
-                             circle=return_feature, linear_num=linear_num)
+                             circle=return_feature, linear_num=linear_num, model_subtype=model_subtype)
     elif opts["use_NAS"]:
         model = create_model(n_classes, "NAS", droprate=droprate,
                              linear_num=linear_num)
