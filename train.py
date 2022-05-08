@@ -276,26 +276,27 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
     # initialize losses
     if opt.arcface:
         criterion_arcface = losses.ArcFaceLoss(
-            num_classes=opt.nclasses, embedding_size=512)
+            num_classes=opt.nclasses, embedding_size=512).to(device)
     if opt.cosface:
         criterion_cosface = losses.CosFaceLoss(
-            num_classes=opt.nclasses, embedding_size=512)
+            num_classes=opt.nclasses, embedding_size=512).to(device)
     if opt.circle:
         # gamma = 64 may lead to a better result.
-        criterion_circle = CircleLoss(m=0.25, gamma=32)
+        criterion_circle = CircleLoss(m=0.25, gamma=32).to(device)
     if opt.triplet:
         miner = miners.MultiSimilarityMiner()
-        criterion_triplet = losses.TripletMarginLoss(margin=0.3)
+        criterion_triplet = losses.TripletMarginLoss(margin=0.3).to(device)
     if opt.lifted:
         criterion_lifted = losses.GeneralizedLiftedStructureLoss(
-            neg_margin=1, pos_margin=0)
+            neg_margin=1, pos_margin=0).to(device)
     if opt.contrast:
-        criterion_contrast = losses.ContrastiveLoss(pos_margin=0, neg_margin=1)
+        criterion_contrast = losses.ContrastiveLoss(
+            pos_margin=0, neg_margin=1).to(device)
     if opt.instance:
-        criterion_instance = InstanceLoss(gamma=opt.ins_gamma)
+        criterion_instance = InstanceLoss(gamma=opt.ins_gamma).to(device)
     if opt.sphere:
         criterion_sphere = losses.SphereFaceLoss(
-            num_classes=opt.nclasses, embedding_size=512, margin=4)
+            num_classes=opt.nclasses, embedding_size=512, margin=4).to(device)
 
     if use_tpu and opt.tpu_cores > 1:
         data_samplers = {
@@ -337,8 +338,8 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
             else:
                 model.train(False)  # Set model to evaluate mode
 
-            running_loss = 0.0
-            running_corrects = 0.0
+            running_loss = torch.zeros(1).to(device)
+            running_corrects = torch.zeros(1).to(device)
 
             for data in loader:
                 # get the inputs
@@ -362,8 +363,8 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                 else:
                     outputs = model(inputs)
 
-                sm = nn.Softmax(dim=1)
-                log_sm = nn.LogSoftmax(dim=1)
+                sm = nn.Softmax(dim=1).to(device)
+                log_sm = nn.LogSoftmax(dim=1).to(device)
                 return_feature = opt.arcface or opt.cosface or opt.circle or opt.triplet or opt.contrast or opt.instance or opt.lifted or opt.sphere
                 if return_feature:
                     logits, ff = outputs
