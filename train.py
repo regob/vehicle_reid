@@ -418,8 +418,8 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                 del loss
                 running_corrects += float(torch.sum(preds == labels.data))
 
-            epoch_loss = running_loss / dataset_sizes[phase]
-            epoch_acc = running_corrects / dataset_sizes[phase]
+            epoch_loss = running_loss.cpu() / dataset_sizes[phase]
+            epoch_acc = running_corrects.cpu() / dataset_sizes[phase]
 
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(
                 phase, epoch_loss.item(), epoch_acc.item()))
