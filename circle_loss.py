@@ -1,4 +1,4 @@
-#from https://github.com/TinyZeaMays/CircleLoss/blob/master/circle_loss.py 
+# from https://github.com/TinyZeaMays/CircleLoss/blob/master/circle_loss.py
 
 from typing import Tuple
 
@@ -36,7 +36,8 @@ class CircleLoss(nn.Module):
         logit_p = - ap * (sp - delta_p) * self.gamma
         logit_n = an * (sn - delta_n) * self.gamma
 
-        loss = self.soft_plus(torch.logsumexp(logit_n, dim=0) + torch.logsumexp(logit_p, dim=0))
+        loss = self.soft_plus(torch.logsumexp(
+            logit_n, dim=0) + torch.logsumexp(logit_p, dim=0))
 
         return loss
 
