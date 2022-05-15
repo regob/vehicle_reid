@@ -52,15 +52,15 @@ def load_model(n_classes, kind="resnet", ckpt=None, remove_classifier=False, **k
 
 def load_model_from_opts(opts_file, ckpt=None, return_feature=False, remove_classifier=False):
     with open(opts_file, "r") as stream:
-        opts=yaml.load(stream, Loader=yaml.FullLoader)
-    n_classes=opts["nclasses"]
-    droprate=opts["droprate"]
-    stride=opts["stride"]
-    linear_num=opts["linear_num"]
-    model_subtype="default" if "model_subtype" not in opts else opts["model_subtype"]
+        opts = yaml.load(stream, Loader=yaml.FullLoader)
+    n_classes = opts["nclasses"]
+    droprate = opts["droprate"]
+    stride = opts["stride"]
+    linear_num = opts["linear_num"]
+    model_subtype = "default" if "model_subtype" not in opts else opts["model_subtype"]
 
     if opts["use_dense"]:
-        model=create_model(n_classes, "densenet", droprate=droprate, circle=return_feature,
+        model = create_model(n_classes, "densenet", droprate=droprate, circle=return_feature,
                              linear_num=linear_num)
     elif opts["use_efficient"]:
         model=create_model(n_classes, "efficientnet", droprate=droprate,
@@ -75,7 +75,7 @@ def load_model_from_opts(opts_file, ckpt=None, return_feature=False, remove_clas
                              linear_num=linear_num)
     elif opts["use_swin"]:
         model = create_model(n_classes, "swin", droprate=droprate, stride=stride,
-                             circle=return_feature, linear_num_=linear_num)
+                             circle=return_feature, linear_num=linear_num)
     else:
         model = create_model(n_classes, "resnet", droprate=droprate, ibn=opts["ibn"],
                              stride=stride, circle=return_feature, linear_num=linear_num)
