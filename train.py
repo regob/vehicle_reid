@@ -118,6 +118,8 @@ parser.add_argument("--start_epoch", default=0, type=int,
 parser.add_argument("--model_subtype", default="default",
                     help="Subtype for each model (b0 to b7 for efficientnet, etc.)")
 parser.add_argument("--debug", action="store_true")
+parser.add_argument("--debug_period", type=int, default=100,
+                    help="Print the loss and grad statistics for *this many* batches at a time.")
 opt = parser.parse_args()
 
 ######################################################################
@@ -342,6 +344,9 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
             running_loss = torch.zeros(1).to(device)
             running_corrects = torch.zeros(1).to(device)
 
+            if opt.debug:
+                loss_history, grad_history = [], []
+
             for data in loader:
                 # get the inputs
                 inputs, labels = data
@@ -396,7 +401,12 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                     loss = criterion(outputs, labels)
 
                 if opt.debug:
-                    print("\nloss: {:.4f}".format(loss.item()))
+                    if len(loss_history) < opt.debug_period:
+                        loss_history.append(loss.item())
+                    else:
+                        print("\nloss:")
+                        print(pd.Series(loss_history).describe())
+                        loss_history = []
 
                 del inputs  # why?
 
@@ -407,9 +417,19 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
 
                 if phase == 'train':
                     loss.backward()
+
                     # perform gradient clipping to prevent divergence
-                    torch.nn.utils.clip_grad_norm_(
+                    old_norm = torch.nn.utils.clip_grad_norm_(
                         model.parameters(), opt.grad_clip_max_norm)
+
+                    if opt.debug:
+                        if len(grad_history) < opt.debug_period:
+                            grad_history.append(old_norm.item())
+                        else:
+                            print("\ngrad:")
+                            print(pd.Series(grad_history).describe())
+                            grad_history = []
+
                     if use_tpu:
                         xm.optimizer_step(optimizer, barrier=True)
                     else:
