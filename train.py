@@ -117,6 +117,7 @@ parser.add_argument("--start_epoch", default=0, type=int,
                     help="Epoch to continue training from.")
 parser.add_argument("--model_subtype", default="default",
                     help="Subtype for each model (b0 to b7 for efficientnet, etc.)")
+parser.add_argument("--debug", action="store_true")
 opt = parser.parse_args()
 
 ######################################################################
@@ -393,6 +394,9 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                 else:
                     _, preds = torch.max(outputs.data, 1)
                     loss = criterion(outputs, labels)
+
+                if opt.debug:
+                    print("\nloss: {:.4f}".format(loss.item()))
 
                 del inputs  # why?
 
