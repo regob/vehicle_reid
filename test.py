@@ -22,7 +22,7 @@ import pandas as pd
 import tqdm
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.dirname(SCRIPT_DIR))
+sys.path.append(SCRIPT_DIR)
 
 from load_model import load_model_from_opts
 from dataset import ImageDataset

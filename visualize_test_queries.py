@@ -221,6 +221,7 @@ def refresh_plot():
     show_query_result(axes, q_img, g_imgs, y, g_labels)
     fig.canvas.draw()
     fig.canvas.flush_events()
+    fig.savefig("reid_query_result.pdf", pad_inches=0, bbox_inches='tight')
 
 
 n_rows = math.ceil((1 + args.num_images) / args.imgs_per_row)

@@ -5,11 +5,11 @@ import yaml
 import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.dirname(SCRIPT_DIR))
+sys.path.append(SCRIPT_DIR)
 
 from model import ft_net, ft_net_dense, ft_net_hr, ft_net_swin, ft_net_efficient, ft_net_NAS, PCB
 
-sys.path.remove(os.path.dirname(SCRIPT_DIR))
+sys.path.remove(SCRIPT_DIR)
 
 
 def load_weights(model, ckpt_path):
@@ -63,13 +63,13 @@ def load_model_from_opts(opts_file, ckpt=None, return_feature=False, remove_clas
         model = create_model(n_classes, "densenet", droprate=droprate, circle=return_feature,
                              linear_num=linear_num)
     elif opts["use_efficient"]:
-        model=create_model(n_classes, "efficientnet", droprate=droprate,
+        model = create_model(n_classes, "efficientnet", droprate=droprate,
                              circle=return_feature, linear_num=linear_num, model_subtype=model_subtype)
     elif opts["use_NAS"]:
-        model=create_model(n_classes, "NAS", droprate=droprate,
+        model = create_model(n_classes, "NAS", droprate=droprate,
                              linear_num=linear_num)
     elif opts["PCB"]:
-        model=create_model(n_classes, "PCB")
+        model = create_model(n_classes, "PCB")
     elif opts["use_hr"]:
         model = create_model(n_classes, "hr", droprate=droprate, circle=return_feature,
                              linear_num=linear_num)

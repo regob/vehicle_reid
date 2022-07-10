@@ -8,6 +8,8 @@ GPU-Re-Ranking/extension/adjacency_matrix/build_adjacency_matrix.egg-info/
 GPU-Re-Ranking/extension/propagation/gnn_propagate.egg-info/
 GPU-Re-Ranking/extension/adjacency_matrix/dist
 GPU-Re-Ranking/extension/propagation/dist
+reid_query_result*
+run_tests.sh
 
 # But not 
 !model/.gitkeep

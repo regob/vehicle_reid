@@ -35,7 +35,7 @@ except ImportError:
 version = torch.__version__
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.dirname(SCRIPT_DIR))
+sys.path.append(SCRIPT_DIR)
 
 from random_erasing import RandomErasing
 from circle_loss import CircleLoss, convert_label_to_similarity
