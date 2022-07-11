@@ -10,6 +10,7 @@ GPU-Re-Ranking/extension/adjacency_matrix/dist
 GPU-Re-Ranking/extension/propagation/dist
 reid_query_result*
 run_tests.sh
+.venv
 
 # But not 
 !model/.gitkeep

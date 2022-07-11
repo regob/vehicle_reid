@@ -51,7 +51,7 @@ parser = argparse.ArgumentParser(description='Training')
 parser.add_argument('--gpu_ids', default='0', type=str,
                     help='gpu_ids: e.g. 0  0,1,2  0,2')
 parser.add_argument('--tpu_cores', default=-1, type=int,
-                    help="use TPU instead of GPU with the given number of cores (1 recommended if not too many cpus")
+                    help="use TPU instead of GPU with the given number of cores (1 recommended if not too many cpus)")
 parser.add_argument('--name', default='ft_ResNet50',
                     type=str, help='output model name')
 parser.add_argument('--data_dir', default='../../datasets/',
@@ -73,6 +73,8 @@ parser.add_argument('--use_efficient', action='store_true',
                     help='use efficientnet-b4')
 parser.add_argument('--use_NAS', action='store_true', help='use NAS')
 parser.add_argument('--use_hr', action='store_true', help='use NAS')
+parser.add_argument("--model_subtype", default="default",
+                    help="Subtype for the model (b0 to b7 for efficientnet)")
 parser.add_argument('--warm_epoch', default=0, type=int,
                     help='the first K epoch that needs warm up')
 parser.add_argument('--total_epoch', default=60,
@@ -115,8 +117,6 @@ parser.add_argument("--checkpoint", default="", type=str,
                     help="Model checkpoint to load.")
 parser.add_argument("--start_epoch", default=0, type=int,
                     help="Epoch to continue training from.")
-parser.add_argument("--model_subtype", default="default",
-                    help="Subtype for each model (b0 to b7 for efficientnet, etc.)")
 parser.add_argument("--debug", action="store_true")
 parser.add_argument("--debug_period", type=int, default=100,
                     help="Print the loss and grad statistics for *this many* batches at a time.")
@@ -241,7 +241,6 @@ def fliplr(img):
 
 def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
     since = time.time()
-
     if use_tpu:
         device = xm.xla_device()
     elif use_gpu:
