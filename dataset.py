@@ -4,6 +4,7 @@ import os
 
 
 class ImageDataset(Dataset):
+    """A labeled image dataset whose annotation is provided as a DataFrame."""
     def __init__(self, img_root, df, target_label, classes="infer", transform=None, target_transform=None):
         self.img_root = img_root
         self.df = df
@@ -23,12 +24,14 @@ class ImageDataset(Dataset):
         return len(self.df)
 
     def get_image(self, idx):
+        """Returns the image at a given index of the dataset."""
         row = self.df.loc[idx]
         pth = os.path.join(self.img_root, row["path"])
         image = Image.open(pth).convert("RGB")
         return image
 
     def __getitem__(self, idx):
+        """Returns the transformed image and label at a given index."""
         row = self.df.loc[idx]
         pth = os.path.join(self.img_root, row["path"])
         image = Image.open(pth).convert("RGB")
