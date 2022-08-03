@@ -157,20 +157,27 @@ Models are trained on VeRi-Wild, VehicleX-SPGAN, and Zala datasets. So this is
 a **cross-domain** experiment, no Cityflow data was used in training.
 
 | model | train data | Rank@1 | mAP | 
-|---|---|---|---|
+|---|---|:---:|:---:|
 | Resnet50-ibn + contrastive | VeRi-Wild | 0.998| 0.359 | 
 | Resnet50-ibn + contrastive | VeRi-Wild + Zala | 0.995 | 0.408 |
 | Resnet50-ibn + contrastive | VeRi-Wild + Zala + VehicleX | 0.998 |0.437 |
+
+### VRIC
+
+| model                      | train data | Rank@1 | Rank@5 | Rank@10 | mAP   |
+|:---------------------------|:----------:|:------:|:------:|:-------:|:-----:|
+| Resnet50-ibn + contrastive | VRIC       | 0.523  | 0.790  | 0.862   | 0.582 |
+
+
 
 ### Zala test
 Private test data with 100 ids.
 
 | model | train data | Rank@1 | mAP | 
-|---|---|---|---|
+|---|---|:---:|:---:|
 | Resnet50-ibn + contrastive | VeRi-Wild | 0.980| 0.706 |
 | Resnet50-ibn + contrastive | VeRi-Wild + Zala | 0.994 | 0.904 |
 | Resnet50-ibn + contrastive | VeRi-Wild + Zala + VehicleX |0.994 |0.9032 |
-
 
 
 ## Citation
