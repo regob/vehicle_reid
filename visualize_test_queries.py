@@ -1,15 +1,17 @@
-import numpy as np
-import pandas as pd
-import torch
-from torch.autograd import Variable
-from torchvision import transforms
 import argparse
 import os
 import sys
-import matplotlib.pyplot as plt
-import tqdm
 import math
 import random
+
+import numpy as np
+import pandas as pd
+import scipy.io
+import torch
+from torch.autograd import Variable
+from torchvision import transforms
+import matplotlib.pyplot as plt
+import tqdm
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
@@ -24,7 +26,7 @@ from dataset import ImageDataset
 parser = argparse.ArgumentParser(
     description="Show sample queries and retrieved gallery images for a reid model")
 parser.add_argument("--model_opts", required=True,
-                    type=str, help="model to use")
+                    type=str, help="model to use, if --use_saved_mat is provided then this is not used.")
 parser.add_argument("--checkpoint", required=True,
                     type=str, help="checkpoint to load for model.")
 parser.add_argument("--query_csv_path", default="../../datasets/id_split_cityflow_query.csv",
@@ -39,6 +41,8 @@ parser.add_argument("--batchsize", type=int, default=64)
 parser.add_argument("--num_images", type=int, default=29,
                     help="number of gallery images to show")
 parser.add_argument("--imgs_per_row", type=int, default=6)
+parser.add_argument("--use_saved_mat", action="store_true",
+                    help="Use precomputed features from a previous test.py run: pytorch_result.mat.")
 args = parser.parse_args()
 
 device = torch.device(
@@ -62,8 +66,6 @@ data_transforms = transforms.Compose([
 query_df = pd.read_csv(args.query_csv_path)
 gallery_df = pd.read_csv(args.gallery_csv_path)
 classes = list(pd.concat([query_df["id"], gallery_df["id"]]).unique())
-
-#gallery_df = gallery_df.loc[:640].copy()
 
 
 image_datasets = {
@@ -179,16 +181,24 @@ def show_query_result(axes, query_img, gallery_imgs, query_label, gallery_labels
 #
 
 
-model = load_model_from_opts(
-    args.model_opts, args.checkpoint, remove_classifier=True)
-model.eval()
-model.to(device)
+if args.use_saved_mat:
+    saved_res = scipy.io.loadmat("pytorch_result.mat")
+    gallery_features = torch.Tensor(saved_res["gallery_f"])
+    gallery_labels = saved_res["gallery_label"].reshape(-1)
+    query_features = torch.Tensor(saved_res["query_f"])
+    query_labels = saved_res["query_label"].reshape(-1)
+else:
+    model = load_model_from_opts(
+        args.model_opts, args.checkpoint, remove_classifier=True)
+    model.eval()
+    model.to(device)
 
-print("Computing gallery features ...")
+    print("Computing gallery features ...")
 
-with torch.no_grad():
-    gallery_features, gallery_labels = extract_features(
-        model, dataloaders["gallery"])
+    with torch.no_grad():
+        gallery_features, gallery_labels = extract_features(
+            model, dataloaders["gallery"])
+        gallery_labels = np.array(gallery_labels)
 
 dataset = image_datasets["query"]
 queries = list(range(len(dataset)))
@@ -196,6 +206,7 @@ random.shuffle(queries)
 
 
 def on_key(event):
+    """If a left or right key was pressed, plots the next query in that direction."""
     global curr_idx
     if event.key == "left":
         curr_idx = (curr_idx - 1) if curr_idx > 0 else len(queries) - 1
@@ -207,13 +218,18 @@ def on_key(event):
 
 
 def refresh_plot():
-    X, y = dataset[curr_idx]
-    with torch.no_grad():
-        q_feature = extract_feature(model, X).cpu()
+    """Computes the result of the current query and shows it on the canvas."""
+    if args.use_saved_mat:
+        q_feature = query_features[curr_idx]
+        y = query_labels[curr_idx]
+    else:
+        X, y = dataset[curr_idx]
+        with torch.no_grad():
+            q_feature = extract_feature(model, X).cpu()
 
     gallery_scores = get_scores(q_feature, gallery_features)
     idx = np.argsort(gallery_scores)[::-1]
-    g_labels = np.array(gallery_labels)[idx]
+    g_labels = gallery_labels[idx]
 
     q_img = dataset.get_image(curr_idx)
     g_imgs = [image_datasets["gallery"].get_image(i)

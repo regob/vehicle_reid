@@ -13,6 +13,20 @@ sys.path.remove(SCRIPT_DIR)
 
 
 def load_weights(model, ckpt_path):
+    """Loads weights of the model from a checkpoint file
+
+    Paremeters
+    ----------
+    model: torch.nn.Module
+        Model to load weights of (needs to have a model.classifier head).
+    ckpt_path: str
+        Path to the checkpoint file to load (e.g net_X.pth).
+
+    Returns
+    -------
+    model: torch.nn.Module
+        The model object with the loaded weights.
+    """
     state = torch.load(ckpt_path, map_location="cpu")
     if model.classifier.classifier[0].weight.shape != state["classifier.classifier.0.weight"].shape:
         state["classifier.classifier.0.weight"] = model.classifier.classifier[0].weight
@@ -22,6 +36,7 @@ def load_weights(model, ckpt_path):
 
 
 def create_model(n_classes, kind="resnet", **kwargs):
+    """Creates a model of a given kind and number of classes"""
     if kind == "resnet":
         return ft_net(n_classes, **kwargs)
     elif kind == "densenet":
@@ -41,6 +56,25 @@ def create_model(n_classes, kind="resnet", **kwargs):
 
 
 def load_model(n_classes, kind="resnet", ckpt=None, remove_classifier=False, **kwargs):
+    """Loads a model of a given type and number of classes.
+
+    Parameters
+    ----------
+    n_classes: int
+        Number of classes at the head.
+    kind: str
+        Type of the model ('resnet', 'efficientnet', 'densenet', 'hr', 'swin', 'NAS', 'PCB').
+    ckpt: Union[str, None]
+        Path to the checkpoint to load or None.
+    remove_classifier: bool
+        Whether or not to remove the classifier head.
+    **kwargs: params to pass to the model
+
+    Returns
+    -------
+    model: torch.nn.Module
+    """
+
     model = create_model(n_classes, kind, **kwargs)
     if ckpt:
         model = load_weights(model, ckpt)
@@ -51,6 +85,27 @@ def load_model(n_classes, kind="resnet", ckpt=None, remove_classifier=False, **k
 
 
 def load_model_from_opts(opts_file, ckpt=None, return_feature=False, remove_classifier=False):
+    """Loads a saved model by reading its opts.yaml file.
+
+    Parameters
+    ----------
+    opts_file: str
+        Path to the saved opts.yaml file of the model
+    ckpt: str
+        Path to the saved checkpoint of the model (net_X.pth)
+    return_feature: bool
+        Shows whether the model has to return the feature along with the result in the forward
+        function. This is needed for certain loss functions (circle loss).
+    remove_classifier: bool
+        Whether we have to remove the classifier block from the model, which is needed for
+        training but not for evaluation
+
+    Returns
+    -------
+    model: torch.nn.Module
+        The model requested to be loaded.
+    """
+
     with open(opts_file, "r") as stream:
         opts = yaml.load(stream, Loader=yaml.FullLoader)
     n_classes = opts["nclasses"]
