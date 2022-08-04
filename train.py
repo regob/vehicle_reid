@@ -3,20 +3,22 @@
 from __future__ import print_function, division
 
 import argparse
+import time
+import os
+import sys
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.cuda.amp as amp
 from torch.optim import lr_scheduler
 from torch.autograd import Variable
 from torchvision import datasets, transforms
 import torch.backends.cudnn as cudnn
+
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
-# from PIL import Image
-import time
-import os
-import sys
 import yaml
 from shutil import copyfile
 import pandas as pd
@@ -250,7 +252,8 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
 
     model = model.to(device)
     if fp16:
-        model = model.half()
+        scaler = amp.GradScaler()
+        # model = model.half()
 
     # create optimizer and scheduler
     optim_name = optim.SGD
@@ -355,49 +358,50 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                     inputs, labels = inputs.to(device), labels.to(device)
 
                 # if we use low precision, input also need to be fp16
-                if fp16:
-                    inputs = inputs.half()
+                # if fp16:
+                #     inputs = inputs.half()
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
 
-                # forward
+                # forward pass 
                 if phase == 'val':
                     with torch.no_grad():
                         outputs = model(inputs)
                 else:
-                    outputs = model(inputs)
+                    with amp.autocast():
+                        outputs = model(inputs)
 
-                return_feature = opt.arcface or opt.cosface or opt.circle or opt.triplet or opt.contrast or opt.instance or opt.lifted or opt.sphere
-                if return_feature:
-                    logits, ff = outputs
-                    fnorm = torch.norm(ff, p=2, dim=1, keepdim=True)
-                    ff = ff.div(fnorm.expand_as(ff))
-                    loss = criterion(logits, labels)
-                    _, preds = torch.max(logits.data, 1)
-                    if opt.arcface:
-                        loss += criterion_arcface(ff, labels) / now_batch_size
-                    if opt.cosface:
-                        loss += criterion_cosface(ff, labels) / now_batch_size
-                    if opt.circle:
-                        loss += criterion_circle(
-                            *convert_label_to_similarity(ff, labels)) / now_batch_size
-                    if opt.triplet:
-                        hard_pairs = miner(ff, labels)
-                        # /now_batch_size
-                        loss += criterion_triplet(ff, labels, hard_pairs)
-                    if opt.lifted:
-                        loss += criterion_lifted(ff, labels)  # /now_batch_size
-                    if opt.contrast:
-                        # /now_batch_size
-                        loss += criterion_contrast(ff, labels)
-                    if opt.instance:
-                        loss += criterion_instance(ff, labels) / now_batch_size
-                    if opt.sphere:
-                        loss += criterion_sphere(ff, labels) / now_batch_size
-                else:
-                    _, preds = torch.max(outputs.data, 1)
-                    loss = criterion(outputs, labels)
+                with amp.autocast():
+                    if return_feature:
+                        logits, ff = outputs
+                        fnorm = torch.norm(ff, p=2, dim=1, keepdim=True)
+                        ff = ff.div(fnorm.expand_as(ff))
+                        loss = criterion(logits, labels)
+                        _, preds = torch.max(logits.data, 1)
+                        if opt.arcface:
+                            loss += criterion_arcface(ff, labels) / now_batch_size
+                        if opt.cosface:
+                            loss += criterion_cosface(ff, labels) / now_batch_size
+                        if opt.circle:
+                            loss += criterion_circle(
+                                *convert_label_to_similarity(ff, labels)) / now_batch_size
+                        if opt.triplet:
+                            hard_pairs = miner(ff, labels)
+                            # /now_batch_size
+                            loss += criterion_triplet(ff, labels, hard_pairs)
+                        if opt.lifted:
+                            loss += criterion_lifted(ff, labels)  # /now_batch_size
+                        if opt.contrast:
+                            # /now_batch_size
+                            loss += criterion_contrast(ff, labels)
+                        if opt.instance:
+                            loss += criterion_instance(ff, labels) / now_batch_size
+                        if opt.sphere:
+                            loss += criterion_sphere(ff, labels) / now_batch_size
+                    else:
+                        _, preds = torch.max(outputs.data, 1)
+                        loss = criterion(outputs, labels)
 
                 if opt.debug:
                     if len(loss_history) < opt.debug_period:
@@ -407,15 +411,20 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                         print(pd.Series(loss_history).describe())
                         loss_history = []
 
-                del inputs  # why?
+                del inputs
 
-                # backward + optimize only if in training phase
+                # adjust loss by warmup learning rate if applicable
                 if epoch < opt.warm_epoch and phase == 'train':
                     warm_up = min(1.0, warm_up + 0.9 / warm_iteration)
                     loss = loss * warm_up
 
+                # backward + optimize only if in training phase
                 if phase == 'train':
-                    loss.backward()
+                    if fp16:
+                        scaler.scale(loss).backward()
+                        scaler.unscale_(optimizer)
+                    else:
+                        loss.backward()
 
                     # perform gradient clipping to prevent divergence
                     old_norm = torch.nn.utils.clip_grad_norm_(
@@ -431,6 +440,9 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
 
                     if use_tpu:
                         xm.optimizer_step(optimizer, barrier=True)
+                    elif fp16:
+                        scaler.step(optimizer)
+                        scaler.update()
                     else:
                         optimizer.step()
 
