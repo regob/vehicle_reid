@@ -78,7 +78,7 @@ parser.add_argument('--use_hr', action='store_true', help='use NAS')
 parser.add_argument("--model_subtype", default="default",
                     help="Subtype for the model (b0 to b7 for efficientnet)")
 parser.add_argument('--warm_epoch', default=0, type=int,
-                    help='the first K epoch that needs warm up')
+                    help='the first K epoch that needs warm up (counted from start_epoch)')
 parser.add_argument('--total_epoch', default=60,
                     type=int, help='total training epoch')
 parser.add_argument('--lr', default=0.05,
@@ -106,7 +106,7 @@ parser.add_argument('--sphere', action='store_true',
                     help='use sphere loss')
 parser.add_argument('--ibn', action='store_true', help='use resnet+ibn')
 parser.add_argument('--fp16', action='store_true',
-                    help='use float16 instead of float32, which will save about 50 percent memory')
+                    help='Use mixed precision training. This will occupy less memory in the forward pass, and will speed up training in some architectures (Nvidia A100, V100, etc.)')
 parser.add_argument("--grad_clip_max_norm", type=float, default=5.0,
                     help="maximum norm of gradient to be clipped to")
 parser.add_argument('--cosine', action='store_true',
@@ -213,28 +213,42 @@ opt.nclasses = len(class_names)
 print("Number of classes in total: {}".format(opt.nclasses))
 
 ######################################################################
+# Some Utilities for training
+#
+
+class DebugInfo:
+    def __init__(self, name, print_period):
+        self.history = []
+        self.name = name
+        self.print_period = print_period
+
+    def step(self, value):
+        self.history.append(value)
+        if len(self.history) >= self.print_period:
+            print("\n{}:".format(self.name))
+            print(pd.Series(self.history).describe())
+            self.history = []
+
+
+            
+######################################################################
 # Training the model
 # ------------------
-#
-# Now, let's write a general function to train a model. Here, we will
-# illustrate:
-#
-# -  Scheduling the learning rate
-# -  Saving the best model
-#
-# In the following, parameter ``scheduler`` is an LR scheduler object from
-# ``torch.optim.lr_scheduler``.
 
-y_loss = {}  # loss history
+
+# loss history
+y_loss = {}
 y_loss['train'] = []
 y_loss['val'] = []
+
+# error history, error = 1 - accuracy
 y_err = {}
 y_err['train'] = []
 y_err['val'] = []
 
 
 def fliplr(img):
-    '''flip horizontal'''
+    """flip a batch of images horizontally"""
     inv_idx = torch.arange(img.size(3) - 1, -1, -
                            1).long().to(img.device)
     img_flip = img.index_select(3, inv_idx)
@@ -344,7 +358,8 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
             running_corrects = torch.zeros(1).to(device)
 
             if opt.debug:
-                loss_history, grad_history = [], []
+                loss_debug = DebugInfo("loss", opt.debug_period)
+                grad_debug = DebugInfo("grad", opt.debug_period)
 
             for data in loader:
                 inputs, labels = data
@@ -356,7 +371,7 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                 # zero the parameter gradients
                 optimizer.zero_grad()
 
-                # forward pass 
+                # forward pass
                 if phase == 'val':
                     with torch.no_grad():
                         outputs = model(inputs)
@@ -395,16 +410,12 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                     _, preds = torch.max(outputs.data, 1)
                     loss = criterion(outputs, labels)
 
+                
                 if opt.debug:
-                    if len(loss_history) < opt.debug_period:
-                        loss_history.append(loss.item())
-                    else:
-                        print("\nloss:")
-                        print(pd.Series(loss_history).describe())
-                        loss_history = []
+                    loss_debug.step(loss.item())
 
                 # adjust loss by warmup learning rate if applicable
-                if epoch < opt.warm_epoch and phase == 'train':
+                if (epoch - start_epoch) < opt.warm_epoch and phase == 'train':
                     warm_up = min(1.0, warm_up + 0.9 / warm_iteration)
                     loss = loss * warm_up
 
@@ -422,12 +433,7 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                         model.parameters(), opt.grad_clip_max_norm)
 
                     if opt.debug:
-                        if len(grad_history) < opt.debug_period:
-                            grad_history.append(old_norm.item())
-                        else:
-                            print("\ngrad:")
-                            print(pd.Series(grad_history).describe())
-                            grad_history = []
+                        grad_debug.step(old_norm.item())
 
                     if use_tpu:
                         xm.optimizer_step(optimizer, barrier=True)
@@ -519,7 +525,7 @@ def save_network(network, epoch_label):
 
 ######################################################################
 # Save opts and load model
-# ----------------------
+# ---------------------------
 
 dir_name = os.path.join(SCRIPT_DIR, "model", name)
 if not os.path.isdir(dir_name):
@@ -546,9 +552,7 @@ model.train()
 
 ######################################################################
 # Train and evaluate
-# ^^^^^^^^^^^^^^^^^^
-#
-#
+# ---------------------------
 
 if use_tpu and opt.tpu_cores > 1:
     flags = {
