@@ -1,23 +1,18 @@
-# -*- coding: utf-8 -*-
-
 from __future__ import print_function, division
 
 import argparse
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.optim import lr_scheduler
-from torch.autograd import Variable
-import torch.backends.cudnn as cudnn
-import numpy as np
-import torchvision
-from torchvision import datasets, models, transforms
+import math
 import time
 import os
 import sys
+
+import torch
+import torch.nn as nn
+from torch.autograd import Variable
+import torch.backends.cudnn as cudnn
+import torchvision
+from torchvision import transforms
 import scipy.io
-import yaml
-import math
 import pandas as pd
 import tqdm
 
@@ -26,6 +21,8 @@ sys.path.append(SCRIPT_DIR)
 
 from load_model import load_model_from_opts
 from dataset import ImageDataset
+
+torchvision_version = list(map(int, torchvision.__version__.split(".")[:2]))
 
 ######################################################################
 # Options
@@ -80,9 +77,11 @@ else:
 # ---------
 #
 h, w = 224, 224
+interpolation = 3 if torchvision_version[0] == 0 and torchvision_version[1] < 13 else \
+    transforms.InterpolationMode.BICUBIC
 
 data_transforms = transforms.Compose([
-    transforms.Resize((h, w), interpolation=3),
+    transforms.Resize((h, w), interpolation=interpolation),
     transforms.ToTensor(),
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])

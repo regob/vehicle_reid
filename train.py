@@ -6,6 +6,7 @@ import argparse
 import time
 import os
 import sys
+import warnings
 
 import torch
 import torch.nn as nn
@@ -13,6 +14,7 @@ import torch.optim as optim
 import torch.cuda.amp as amp
 from torch.optim import lr_scheduler
 from torch.autograd import Variable
+import torchvision
 from torchvision import datasets, transforms
 import torch.backends.cudnn as cudnn
 
@@ -34,7 +36,8 @@ try:
 except ImportError:
     print("WARNING: torch_xla not installed, TPU training and the --tpu_cores argument wont work")
 
-version = torch.__version__
+version = list(map(int, torch.__version__.split(".")[:2]))
+torchvision_version = list(map(int, torchvision.__version__.split(".")[:2]))
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(SCRIPT_DIR)
@@ -124,7 +127,8 @@ parser.add_argument("--debug_period", type=int, default=100,
                     help="Print the loss and grad statistics for *this many* batches at a time.")
 opt = parser.parse_args()
 
-
+if opt.label_smoothing > 0.0 and version[0] < 1 or version[1] < 10:
+    warnings.warn("Label smoothing is supported only from torch 1.10.0, the parameter will be ignored")
 
 ######################################################################
 # Configure devices
@@ -162,10 +166,12 @@ else:
 #
 
 h, w = 224, 224
+interpolation = 3 if torchvision_version[0] == 0 and torchvision_version[1] < 13 else \
+    transforms.InterpolationMode.BICUBIC
 
 transform_train_list = [
     # transforms.RandomResizedCrop(size=128, scale=(0.75,1.0), ratio=(0.75,1.3333), interpolation=3), #Image.BICUBIC)
-    transforms.Resize((h, w), interpolation=3),
+    transforms.Resize((h, w), interpolation=interpolation),
     transforms.Pad(10),
     transforms.RandomCrop((h, w)),
     transforms.RandomHorizontalFlip(),
@@ -174,7 +180,7 @@ transform_train_list = [
 ]
 
 transform_val_list = [
-    transforms.Resize(size=(h, w), interpolation=3),  # Image.BICUBIC
+    transforms.Resize(size=(h, w), interpolation=interpolation),
     transforms.ToTensor(),
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ]
@@ -446,13 +452,9 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                     else:
                         optimizer.step()
 
-                if int(version[0]) > 0 or int(version[2]) > 3:
-                    running_loss += loss.item() * now_batch_size
-                else:  # for the old version like 0.3.0 and 0.3.1
-                    running_loss += loss.data[0] * now_batch_size
-                del loss
+                running_loss += loss.item() * now_batch_size
                 running_corrects += float(torch.sum(preds == labels.data))
-
+                
             epoch_loss = running_loss.cpu() / dataset_sizes[phase]
             epoch_acc = running_corrects.cpu() / dataset_sizes[phase]
 
@@ -488,7 +490,11 @@ def tpu_map_fn(index, flags):
     """ Thread initialization function for TPU processes """
 
     torch.manual_seed(flags["seed"])
-    criterion = nn.CrossEntropyLoss(label_smoothing=opt.label_smoothing)
+    if version[0] > 1 or (version[0] == 1 and version[1] >= 10):
+        criterion = nn.CrossEntropyLoss(label_smoothing=opt.label_smoothing)
+    else:
+        criterion = nn.CrossEntropyLoss()
+
     train_model(model, criterion, opt.start_epoch, opt.total_epoch,
                 num_workers=flags["num_workers"])
 
@@ -565,6 +571,10 @@ if use_tpu and opt.tpu_cores > 1:
     xmp.spawn(tpu_map_fn, args=(flags, ), nprocs=opt.tpu_cores,
               start_method="fork")
 else:
-    criterion = nn.CrossEntropyLoss(label_smoothing=opt.label_smoothing)
+    if version[0] > 1 or (version[0] == 1 and version[1] >= 10):
+        criterion = nn.CrossEntropyLoss(label_smoothing=opt.label_smoothing)
+    else:
+        criterion = nn.CrossEntropyLoss()
+
     model = train_model(
         model, criterion, start_epoch=opt.start_epoch, num_epochs=opt.total_epoch)
