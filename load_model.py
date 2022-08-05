@@ -112,28 +112,32 @@ def load_model_from_opts(opts_file, ckpt=None, return_feature=False, remove_clas
     droprate = opts["droprate"]
     stride = opts["stride"]
     linear_num = opts["linear_num"]
+    
     model_subtype = "default" if "model_subtype" not in opts else opts["model_subtype"]
+    model_type = "resnet_ibn" if "model" not in opts else opts["model"]
 
-    if opts["use_dense"]:
+    if model_type in ("resnet", "resnet_ibn"):
+        model = create_model(n_classes, "resnet", droprate=droprate, ibn=(model_type == "resnet_ibn"),
+                             stride=stride, circle=return_feature, linear_num=linear_num)
+    elif model_type == "densenet":
         model = create_model(n_classes, "densenet", droprate=droprate, circle=return_feature,
                              linear_num=linear_num)
-    elif opts["use_efficient"]:
+    elif model_type == "efficientnet":
         model = create_model(n_classes, "efficientnet", droprate=droprate,
                              circle=return_feature, linear_num=linear_num, model_subtype=model_subtype)
-    elif opts["use_NAS"]:
+    elif model_type == "NAS":
         model = create_model(n_classes, "NAS", droprate=droprate,
                              linear_num=linear_num)
-    elif opts["PCB"]:
+    elif model_type == "PCB":
         model = create_model(n_classes, "PCB")
-    elif opts["use_hr"]:
+    elif model_type == "hr":
         model = create_model(n_classes, "hr", droprate=droprate, circle=return_feature,
                              linear_num=linear_num)
-    elif opts["use_swin"]:
+    elif model_type == "swin":
         model = create_model(n_classes, "swin", droprate=droprate, stride=stride,
                              circle=return_feature, linear_num=linear_num)
     else:
-        model = create_model(n_classes, "resnet", droprate=droprate, ibn=opts["ibn"],
-                             stride=stride, circle=return_feature, linear_num=linear_num)
+        raise ValueError("Unsupported model type: {}".format(model_type))
 
     if ckpt:
         load_weights(model, ckpt)

@@ -1,7 +1,14 @@
 <h1 align="center"> Vehicle ReID </h1>
 <h2 align="center"> Strong, Small, (Un)friendly </h2>
 
-Baseline code for vehicle reID. Based on [layumi's person re-id
+[![Language grade: Python](https://img.shields.io/lgtm/grade/python/github/regob/vehicle_reid)](https://lgtm.com/projects/g/regob/vehicle_reid/context:python)
+[![Total
+alerts](https://img.shields.io/lgtm/alerts/github/regob/vehicle_reid?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/regob/vehicle_reid/)
+[![Total LOC](https://img.shields.io/tokei/lines/github/regob/vehicle_reid)](https://img.shields.io/tokei/lines/github/regob/vehicle_reid?style=flat-square)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+
+
+Baseline code for vehicle re-identification. Based on [layumi's person re-id
 repo](https://github.com/layumi/Person_reID_baseline_pytorch).
 
 **A vehicle re-id tutorial is available now in a
@@ -65,14 +72,15 @@ The `train.py` script can be used to train a model, and saves it into a subdirec
 
 Other very important parameters:
 - `--batchsize`: Batch size during training, should be reasonable (like 32, 64).
-- `--ibn`: By default a Resnet50 is trained, this switch turns it into a Resnet-IBN-a.
+- `--model`: By default a Resnet50-ibn is trained. All options are: ['resnet', 'resnet_ibn', densenet', 'swin',
+                    'NAS', 'hr', 'efficientnet']
 - `--total_epoch`: Number of epochs - around 15 to 20 is needed at a minimum depending on the size of the dataset (with ~400 000 images I got decent results even after 10)
 - `--warm_epoch`: Number of warmup epochs (increase learning rate gradually)
 - `--save_freq`: Sets the frequency of saving a model in epochs (1: saving after each one, 2: after every second, etc), but the model is saved at the very end regardless.
 - `--lr`: Learning rate.
-- `--fp16`: Use Half precision training.
+- `--fp16`: Use Mixed precision training (convert to float16 automatically in
+  forward pass)
 - `--triplet`, `--contrast`, `--sphere`, `--circle`: Loss functions.
-- `--erasing_p`: Erasing Augmentation probability.
 
 The following command is an example to train a Resnet50-ibn with contrastive loss:
 
@@ -84,13 +92,12 @@ python3 train.py \
     --val_csv_path=datasets/annot/id_split_val.csv \
     --save_freq=1 \
     --fp16 \
-    --ibn \
     --contrast \
     --total_epoch=20
 ```
 
 If we cannot complete the whole training in one session, it can be continued from a checkpoint by providing the following parameters:
-- `--model`: it's value is the same as in the previous run
+- `--name`: it's value is the same as in the previous run
 - `--checkpoint`: A model weight to be loaded, it is under the model's directory with the name of`net_X.pth`. (X = the number of epochs)
 - `--start_epoch`: Epoch to continue from, if the checkpoint was `net_X.pth` this should be `X+1`.
 
