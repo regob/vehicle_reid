@@ -92,6 +92,7 @@ parser.add_argument('--erasing_p', default=0.5, type=float,
                     help='Random Erasing probability, in [0,1]')
 parser.add_argument('--color_jitter', action='store_true',
                     help='use color jitter in training')
+parser.add_argument("--label_smoothing", default=0.0, type=float)
 
 parser.add_argument("--model", default="resnet_ibn",
                     help="""what model to use, supported values: ['resnet', 'resnet_ibn', densenet', 'swin',
@@ -122,6 +123,8 @@ parser.add_argument("--debug", action="store_true")
 parser.add_argument("--debug_period", type=int, default=100,
                     help="Print the loss and grad statistics for *this many* batches at a time.")
 opt = parser.parse_args()
+
+
 
 ######################################################################
 # Configure devices
@@ -418,7 +421,7 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                 # backward + optimize only if in training phase
                 if phase == 'train':
                     if fp16:
-                        autocast.__exit__()
+                        autocast.__exit__(None, None, None)
                         scaler.scale(loss).backward()
                         scaler.unscale_(optimizer)
                     else:
@@ -481,7 +484,7 @@ def tpu_map_fn(index, flags):
     """ Thread initialization function for TPU processes """
 
     torch.manual_seed(flags["seed"])
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(label_smoothing=opt.label_smoothing)
     train_model(model, criterion, opt.start_epoch, opt.total_epoch,
                 num_workers=flags["num_workers"])
 
@@ -558,6 +561,6 @@ if use_tpu and opt.tpu_cores > 1:
     xmp.spawn(tpu_map_fn, args=(flags, ), nprocs=opt.tpu_cores,
               start_method="fork")
 else:
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(label_smoothing=opt.label_smoothing)
     model = train_model(
         model, criterion, start_epoch=opt.start_epoch, num_epochs=opt.total_epoch)

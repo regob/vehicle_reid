@@ -69,16 +69,15 @@ class ClassBlock(nn.Module):
             return x
 
 # Define the ResNet50-based Model
-
-
 class ft_net(nn.Module):
 
     def __init__(self, class_num=751, droprate=0.5, stride=2, circle=False, ibn=False, linear_num=512):
         super(ft_net, self).__init__()
-        model_ft = models.resnet50(pretrained=True)
-        if ibn == True:
+        if ibn:
             model_ft = torch.hub.load(
                 'XingangPan/IBN-Net', 'resnet50_ibn_a', pretrained=True)
+        else:
+            model_ft = models.resnet50(weights="IMAGENET1K_V2")
         # avg pooling to global pooling
         if stride == 1:
             model_ft.layer4[0].downsample[0].stride = (1, 1)
@@ -125,9 +124,8 @@ class ft_net_swin(nn.Module):
         x = self.classifier(x)
         return x
 
+    
 # Define the HRNet18-based Model
-
-
 class ft_net_hr(nn.Module):
     def __init__(self, class_num, droprate=0.5, circle=False, linear_num=512):
         super().__init__()
