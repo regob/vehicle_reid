@@ -283,10 +283,14 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
     ], weight_decay=5e-4, momentum=0.9, nesterov=True)
 
     scheduler = lr_scheduler.StepLR(
-        optimizer, step_size=10, gamma=0.1, last_epoch=opt.start_epoch - 1)
+        optimizer, step_size=10, gamma=0.1)
     if opt.cosine:
         scheduler = lr_scheduler.CosineAnnealingLR(
             optimizer, opt.total_epoch, eta_min=0.01 * opt.lr)
+
+    for _ in range(start_epoch):
+        scheduler.step()
+            
 
     warm_up = 0.1  # We start from the 0.1*lrRate
     warm_iteration = round(
