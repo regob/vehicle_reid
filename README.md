@@ -171,9 +171,23 @@ a **cross-domain** experiment, no Cityflow data was used in training.
 
 ### VRIC
 
-| model                      | train data | Rank@1 | Rank@5 | Rank@10 | mAP   |
-|:---------------------------|:----------:|:------:|:------:|:-------:|:-----:|
-| Resnet50-ibn + contrastive | VRIC       | 0.523  | 0.790  | 0.862   | 0.582 |
+Models trained on random 75% of VRIC train, and tested on VRIC test.
+All trainings used cross entropy as **id loss**, this is not listed in losses.
+Params not in the table are constant: `--batchsize=64`, `--total_epoch=30`,
+`--warm_epoch=3`, `--erasing_p=0.5`. No re-ranking was used.
+
+
+| model           | metric losses | other params             | Rank@1    | Rank@5    | Rank@10   | mAP       |
+|:----------------|:-------------:|:------------------------:|:---------:|:---------:|:---------:|:---------:|
+| Resnet50-ibn    | `--contrast`  |                          | **0.549** | **0.804** | **0.873** | **0.607** |
+| Resnet50-ibn    | `--sphere`    |                          | 0.552     | 0.795     | 0.862     | 0.606     |
+| Resnet50-ibn    | `--instance`  |                          | 0.544     | 0.789     | 0.865     | 0.600     |
+| Resnet50-ibn    | `--arcface`   |                          | 0.538     | 0.792     | 0.863     | 0.595     |
+| Resnet50-ibn    | `--circle`    |                          | 0.514     | 0.782     | 0.857     | 0.574     |
+| Resnet50-ibn    | `--contrast`  | `--label_smoothing=0.05` | 0.538     | 0.789     | 0.870     | 0.595     |
+| Resnet50-ibn    |               |                          | 0.531     | 0.787     | 0.864     | 0.589     |
+| Resnet50        |               |                          | 0.453     | 0.734     | 0.825     | 0.516     |
+| Efficientnet-b0 |               |                          | 0.475     | 0.737     | 0.822     | 0.534     |
 
 
 

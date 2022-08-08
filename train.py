@@ -9,11 +9,9 @@ import sys
 import warnings
 
 import torch
-import torch.nn as nn
 import torch.optim as optim
 import torch.cuda.amp as amp
 from torch.optim import lr_scheduler
-from torch.autograd import Variable
 import torchvision
 from torchvision import datasets, transforms
 import torch.backends.cudnn as cudnn
@@ -29,7 +27,6 @@ import tqdm
 from pytorch_metric_learning import losses, miners
 
 try:
-    import torch_xla
     import torch_xla.core.xla_model as xm
     import torch_xla.distributed.xla_multiprocessing as xmp
     import torch_xla.distributed.parallel_loader as pl
@@ -410,8 +407,7 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                     if opt.lifted:
                         loss += criterion_lifted(ff, labels)  # /now_batch_size
                     if opt.contrast:
-                        # /now_batch_size
-                        loss += criterion_contrast(ff, labels)
+                        loss += criterion_contrast(ff, labels) # / now_batch_size
                     if opt.instance:
                         loss += criterion_instance(ff, labels) / now_batch_size
                     if opt.sphere:
@@ -491,9 +487,9 @@ def tpu_map_fn(index, flags):
 
     torch.manual_seed(flags["seed"])
     if version[0] > 1 or (version[0] == 1 and version[1] >= 10):
-        criterion = nn.CrossEntropyLoss(label_smoothing=opt.label_smoothing)
+        criterion = torch.nn.CrossEntropyLoss(label_smoothing=opt.label_smoothing)
     else:
-        criterion = nn.CrossEntropyLoss()
+        criterion = torch.nn.CrossEntropyLoss()
 
     train_model(model, criterion, opt.start_epoch, opt.total_epoch,
                 num_workers=flags["num_workers"])
@@ -572,9 +568,9 @@ if use_tpu and opt.tpu_cores > 1:
               start_method="fork")
 else:
     if version[0] > 1 or (version[0] == 1 and version[1] >= 10):
-        criterion = nn.CrossEntropyLoss(label_smoothing=opt.label_smoothing)
+        criterion = torch.nn.CrossEntropyLoss(label_smoothing=opt.label_smoothing)
     else:
-        criterion = nn.CrossEntropyLoss()
+        criterion = torch.nn.CrossEntropyLoss()
 
     model = train_model(
         model, criterion, start_epoch=opt.start_epoch, num_epochs=opt.total_epoch)
