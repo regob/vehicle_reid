@@ -10,10 +10,12 @@ alerts](https://img.shields.io/lgtm/alerts/github/regob/vehicle_reid?logo=lgtm&l
 
 Baseline code for vehicle re-identification. Based on [layumi's person re-id
 repo](https://github.com/layumi/Person_reID_baseline_pytorch).
+The code is general, and works for any re-id task or dataset if the
+required annotation files are created.
 
 **A vehicle re-id tutorial is available now in a
 [Kaggle notebook](https://www.kaggle.com/code/sosperec/vehicle-reid-tutorial/)
-for training and evaluating a model on the VRIC dataset.**
+for training, evaluating, and using a model.**
 
 ## Installation
 Tested on python3.8, but other versions could work too.

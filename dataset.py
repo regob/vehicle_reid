@@ -53,6 +53,7 @@ class BatchSampler:
         self.samples_per_class = samples_per_class
         self.drop_last = drop_last
         self.batches, self.batch_idx = [], 0
+        
 
     def __iter__(self):
         ids = self.dataset.df[self.dataset.target_label]
@@ -82,7 +83,11 @@ class BatchSampler:
         return self
 
     def __len__(self):
-        return len(self.batches)
+        n_samples = len(self.dataset.df)
+        n_batches = n_samples // self.batch_size
+        if not self.drop_last and n_samples % self.batch_size != 0:
+            n_batches += 1
+        return n_batches
 
     def __next__(self):
         self.batch_idx += 1
@@ -90,14 +95,5 @@ class BatchSampler:
             raise StopIteration()
         return self.batches[self.batch_idx - 1]
 
-
-if __name__ == "__main__":
-    import pandas as pd
-    df = pd.read_csv("../../datasets/annot/id_split_zala_debug.csv")
-    ds = ImageDataset("../../datasets", df, "id")
-    bs = BatchSampler(ds, 32, 4)
-    idxes = []
-    for batch in iter(bs):
-        idxes.extend(batch)
-    assert len(idxes) == len(set(idxes))
-    assert len(idxes) == len(df) - len(df) % bs.batch_size
+    
+    
