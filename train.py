@@ -43,7 +43,7 @@ from random_erasing import RandomErasing
 from circle_loss import CircleLoss, convert_label_to_similarity
 from instance_loss import InstanceLoss
 from load_model import load_model_from_opts
-from dataset import ImageDataset
+from dataset import ImageDataset, BatchSampler
 
 
 ######################################################################
@@ -93,6 +93,9 @@ parser.add_argument('--erasing_p', default=0.5, type=float,
 parser.add_argument('--color_jitter', action='store_true',
                     help='use color jitter in training')
 parser.add_argument("--label_smoothing", default=0.0, type=float)
+parser.add_argument("--samples_per_class", default=1, type=int,
+                    help="Batch sampling strategy. Batches are sampled from groups of the same class with *this many* elements, if possible. Ordinary random sampling is achieved by setting this to 1.")
+                    
 
 parser.add_argument("--model", default="resnet_ibn",
                     help="""what model to use, supported values: ['resnet', 'resnet_ibn', densenet', 'swin',
@@ -125,7 +128,9 @@ parser.add_argument("--debug_period", type=int, default=100,
 opt = parser.parse_args()
 
 if opt.label_smoothing > 0.0 and version[0] < 1 or version[1] < 10:
-    warnings.warn("Label smoothing is supported only from torch 1.10.0, the parameter will be ignored")
+    warnings.warn(
+        "Label smoothing is supported only from torch 1.10.0, the parameter will be ignored")
+
 
 ######################################################################
 # Configure devices
@@ -197,19 +202,13 @@ data_transforms = {
 }
 
 image_datasets = {}
-if not opt.train_csv_path:
-    image_datasets['train'] = datasets.ImageFolder(os.path.join(data_dir, 'train'),
-                                                   data_transforms['train'])
-    image_datasets['val'] = datasets.ImageFolder(os.path.join(data_dir, 'val'),
-                                                 data_transforms['val'])
-else:
-    train_df = pd.read_csv(opt.train_csv_path)
-    val_df = pd.read_csv(opt.val_csv_path)
-    all_ids = list(set(train_df["id"]).union(set(val_df["id"])))
-    image_datasets["train"] = ImageDataset(
-        opt.data_dir, train_df, "id", classes=all_ids, transform=data_transforms["train"])
-    image_datasets["val"] = ImageDataset(
-        opt.data_dir, val_df, "id", classes=all_ids, transform=data_transforms["val"])
+train_df = pd.read_csv(opt.train_csv_path)
+val_df = pd.read_csv(opt.val_csv_path)
+all_ids = list(set(train_df["id"]).union(set(val_df["id"])))
+image_datasets["train"] = ImageDataset(
+    opt.data_dir, train_df, "id", classes=all_ids, transform=data_transforms["train"])
+image_datasets["val"] = ImageDataset(
+    opt.data_dir, val_df, "id", classes=all_ids, transform=data_transforms["val"])
 
 
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
@@ -293,7 +292,6 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
 
     for _ in range(start_epoch):
         scheduler.step()
-            
 
     warm_up = 0.1  # We start from the 0.1*lrRate
     warm_iteration = round(
@@ -334,18 +332,32 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
             )
             for x in ["train", "val"]
         }
-    else:
-        data_samplers = {x: None for x in ["train", "val"]}
 
-    dataloaders = {
-        x: torch.utils.data.DataLoader(image_datasets[x],
-                                       batch_size=opt.batchsize,
-                                       sampler=data_samplers[x],
-                                       num_workers=num_workers,
-                                       drop_last=True,
-                                       pin_memory=True)
-        for x in ['train', 'val']
-    }
+        dataloaders = {
+            x: torch.utils.data.DataLoader(image_datasets[x],
+                                           batch_size=opt.batchsize,
+                                           sampler=data_samplers[x],
+                                           num_workers=num_workers,
+                                           drop_last=(x == "train"),
+                                           pin_memory=True)
+            for x in ['train', 'val']
+        }
+
+    else:
+        train_sampler = BatchSampler(
+            image_datasets["train"], opt.batchsize, opt.samples_per_class)
+
+        dataloaders = {
+            "val": torch.utils.data.DataLoader(image_datasets["val"],
+                                               batch_size=opt.batchsize,
+                                               num_workers=num_workers,
+                                               pin_memory=True),
+            
+            "train": torch.utils.data.DataLoader(image_datasets["train"],
+                                                 batch_sampler=train_sampler,
+                                                 num_workers=num_workers,
+                                                 pin_memory=True)
+        }
 
     for epoch in range(start_epoch, num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
@@ -407,7 +419,8 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
                     if opt.lifted:
                         loss += criterion_lifted(ff, labels)  # /now_batch_size
                     if opt.contrast:
-                        loss += criterion_contrast(ff, labels) # / now_batch_size
+                        # / now_batch_size
+                        loss += criterion_contrast(ff, labels)
                     if opt.instance:
                         loss += criterion_instance(ff, labels) / now_batch_size
                     if opt.sphere:
@@ -450,7 +463,7 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
 
                 running_loss += loss.item() * now_batch_size
                 running_corrects += float(torch.sum(preds == labels.data))
-                
+
             epoch_loss = running_loss.cpu() / dataset_sizes[phase]
             epoch_acc = running_corrects.cpu() / dataset_sizes[phase]
 
@@ -487,7 +500,8 @@ def tpu_map_fn(index, flags):
 
     torch.manual_seed(flags["seed"])
     if version[0] > 1 or (version[0] == 1 and version[1] >= 10):
-        criterion = torch.nn.CrossEntropyLoss(label_smoothing=opt.label_smoothing)
+        criterion = torch.nn.CrossEntropyLoss(
+            label_smoothing=opt.label_smoothing)
     else:
         criterion = torch.nn.CrossEntropyLoss()
 
@@ -568,7 +582,8 @@ if use_tpu and opt.tpu_cores > 1:
               start_method="fork")
 else:
     if version[0] > 1 or (version[0] == 1 and version[1] >= 10):
-        criterion = torch.nn.CrossEntropyLoss(label_smoothing=opt.label_smoothing)
+        criterion = torch.nn.CrossEntropyLoss(
+            label_smoothing=opt.label_smoothing)
     else:
         criterion = torch.nn.CrossEntropyLoss()
 

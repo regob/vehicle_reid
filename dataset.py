@@ -1,10 +1,12 @@
 from torch.utils.data import Dataset
 from PIL import Image
+import random
 import os
 
 
 class ImageDataset(Dataset):
     """A labeled image dataset whose annotation is provided as a DataFrame."""
+
     def __init__(self, img_root, df, target_label, classes="infer", transform=None, target_transform=None):
         self.img_root = img_root
         self.df = df
@@ -41,3 +43,61 @@ class ImageDataset(Dataset):
         if self.target_transform:
             label = self.target_transform(label)
         return image, label
+
+
+class BatchSampler:
+    def __init__(self, dataset, batch_size, samples_per_class, drop_last=True):
+        """Samples a dataset into batches, with the given number of samples per class if possible."""
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.samples_per_class = samples_per_class
+        self.drop_last = drop_last
+        self.batches, self.batch_idx = [], 0
+
+    def __iter__(self):
+        ids = self.dataset.df[self.dataset.target_label]
+        ids = ids.sample(frac=1.0)
+        samples_for_id = {}
+        for idx, cls in ids.iteritems():
+            samples_for_id.setdefault(cls, []).append(idx)
+
+        # create patches of size: samples_per_class
+        patches = []
+        for _, samples in samples_for_id.items():
+            for i in range(0, len(samples), self.samples_per_class):
+                patches.append(samples[i:i + self.samples_per_class])
+
+        random.shuffle(patches)
+        self.batches, self.batch_idx = [[]], 0
+        for patch in patches:
+            last_batch = self.batches[-1]
+            if len(patch) + len(last_batch) <= self.batch_size:
+                last_batch.extend(patch)
+            else:
+                num_needed = self.batch_size - len(last_batch)
+                last_batch.extend(patch[:num_needed])
+                self.batches.append(patch[num_needed:])
+        if len(self.batches[-1]) < self.batch_size:
+            self.batches.pop()
+        return self
+
+    def __len__(self):
+        return len(self.batches)
+
+    def __next__(self):
+        self.batch_idx += 1
+        if self.batch_idx > len(self.batches):
+            raise StopIteration()
+        return self.batches[self.batch_idx - 1]
+
+
+if __name__ == "__main__":
+    import pandas as pd
+    df = pd.read_csv("../../datasets/annot/id_split_zala_debug.csv")
+    ds = ImageDataset("../../datasets", df, "id")
+    bs = BatchSampler(ds, 32, 4)
+    idxes = []
+    for batch in iter(bs):
+        idxes.extend(batch)
+    assert len(idxes) == len(set(idxes))
+    assert len(idxes) == len(df) - len(df) % bs.batch_size
