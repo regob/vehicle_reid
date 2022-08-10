@@ -10,7 +10,7 @@ alerts](https://img.shields.io/lgtm/alerts/github/regob/vehicle_reid?logo=lgtm&l
 
 Baseline code for vehicle re-identification. Based on [layumi's person re-id
 repo](https://github.com/layumi/Person_reID_baseline_pytorch).
-The code is general, and works for any re-id task or dataset if the
+The code is general, and works for any re-id task or dataset (not just vehicles) if the
 required annotation files are created.
 
 **A vehicle re-id tutorial is available now in a
@@ -167,30 +167,37 @@ a **cross-domain** experiment, no Cityflow data was used in training.
 
 | model | train data | Rank@1 | mAP | 
 |---|---|:---:|:---:|
-| Resnet50-ibn + contrastive | VeRi-Wild | 0.998| 0.359 | 
-| Resnet50-ibn + contrastive | VeRi-Wild + Zala | 0.995 | 0.408 |
-| Resnet50-ibn + contrastive | VeRi-Wild + Zala + VehicleX | 0.998 |0.437 |
+| Resnet50-ibn + contrastive | VeRi-Wild | 99.8| 35.9 | 
+| Resnet50-ibn + contrastive | VeRi-Wild + Zala | 99.5 | 40.8 |
+| Resnet50-ibn + contrastive | VeRi-Wild + Zala + VehicleX | 99.8 |43.7 |
 
 ### VRIC
 
-Models trained on random 75% of VRIC train, and tested on VRIC test.
+Models are trained on a random 75% of VRIC train, and tested on VRIC test.
 All trainings used cross entropy as **id loss**, this is not listed in losses.
-Params not in the table are constant: `--batchsize=64`, `--total_epoch=30`,
-`--warm_epoch=3`, `--erasing_p=0.5`. No re-ranking was used.
+The default param values used (these are only mentioned in the table if they
+differ from this):  
+`--batchsize=32`, `--total_epoch=20`, `--warm_epoch=3`, `--erasing_p=0.5`,
+`--samples_per_class=4`, `--lr=0.05`
 
 
-| model           | metric losses | other params             | Rank@1    | Rank@5    | Rank@10   | mAP       |
-|:----------------|:-------------:|:------------------------:|:---------:|:---------:|:---------:|:---------:|
-| Resnet50-ibn    | `--contrast`  |                          | **0.549** | **0.804** | **0.873** | **0.607** |
-| Resnet50-ibn    | `--sphere`    |                          | 0.552     | 0.795     | 0.862     | 0.606     |
-| Resnet50-ibn    | `--instance`  |                          | 0.544     | 0.789     | 0.865     | 0.600     |
-| Resnet50-ibn    | `--arcface`   |                          | 0.538     | 0.792     | 0.863     | 0.595     |
-| Resnet50-ibn    | `--circle`    |                          | 0.514     | 0.782     | 0.857     | 0.574     |
-| Resnet50-ibn    | `--contrast`  | `--label_smoothing=0.05` | 0.538     | 0.789     | 0.870     | 0.595     |
-| Resnet50-ibn    |               |                          | 0.531     | 0.787     | 0.864     | 0.589     |
-| Resnet50        |               |                          | 0.453     | 0.734     | 0.825     | 0.516     |
-| Efficientnet-b0 |               |                          | 0.475     | 0.737     | 0.822     | 0.534     |
-
+| model           | metric losses            | other params                              | Rank@1 | Rank@5 | Rank@10 | mAP   |
+|:----------------:|:------------------------:|:-----------------------------------------:|:------:|:------:|:-------:|:-----:|
+|<img width=200/> Resnet50-ibn    | `--circle`, `--contrast` |                                           | **73.1**  | **91.0**  | **94.8**   | **77.1** |
+| Resnet50-ibn    | `--contrast`             |                                           | 72.3  | 89.6  | 93.0   | 76.2 |
+| Resnet50-ibn    | `--circle`               |                                           | 72.1  | 90.7  | 94.3   | 76.2 |
+| Resnet50-ibn    | `--triplet`              |                                           | 71.9  | 89.2  | 93.0   | 75.9 |
+| Resnet50-ibn    | `--instance`             |                                           | 68.6  | 86.8  | 90.8   | 72.7 |
+| Resnet50-ibn    | `--arcface`              |                                           | 68.3  | 87.3  | 91.0   | 72.5 |
+| Resnet50-ibn    | `--sphere`               |                                           | 68.0  | 86.6  | 90.5   | 72.1 |
+| Resnet50-ibn    |                          |                                           | 68.4  | 86.8  | 90.4   | 72.5 |
+| Resnet50-ibn    |                          | `--samples_per_class=1`                   | 67.3  | 86.7  | 91.2   | 71.7 |
+| Resnet50-ibn    |                          | `--batchsize=64`                          | 64.5  | 84.5  | 89.9   | 69.1 |
+| Resnet50-ibn    |                          | `--batchsize=64`, `--samples_per_class=6` | 64.6  | 83.9  | 88.3   | 69.0 |
+| Resnet50-ibn    |                          | `--label_smoothing=0.05`                  | 68.5  | 86.4  | 90.3   | 72.5 |
+| Resnet50-ibn    |                          | `--fp16`                                  | 68.6  | 86.5  | 90.7   | 72.6 |
+| Resnet50        |                          |                                           | 64.6  | 84.8  | 89.6   | 69.2 |
+| Efficientnet-b0 |                          |                                           | 63.7  | 83.3  | 88.1   | 68.2 |
 
 
 ### Zala test
@@ -198,9 +205,9 @@ Private test data with 100 ids.
 
 | model | train data | Rank@1 | mAP | 
 |---|---|:---:|:---:|
-| Resnet50-ibn + contrastive | VeRi-Wild | 0.980| 0.706 |
-| Resnet50-ibn + contrastive | VeRi-Wild + Zala | 0.994 | 0.904 |
-| Resnet50-ibn + contrastive | VeRi-Wild + Zala + VehicleX |0.994 |0.9032 |
+| Resnet50-ibn + contrastive | VeRi-Wild | 98.0| 70.6 |
+| Resnet50-ibn + contrastive | VeRi-Wild + Zala | 99.4 | 90.4 |
+| Resnet50-ibn + contrastive | VeRi-Wild + Zala + VehicleX |99.4 |90.32 |
 
 
 ## Citation
