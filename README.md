@@ -181,23 +181,26 @@ differ from this):
 `--samples_per_class=4`, `--lr=0.05`
 
 
-| model           | metric losses            | other params                              | Rank@1 | Rank@5 | Rank@10 | mAP   |
-|:----------------:|:------------------------:|:-----------------------------------------:|:------:|:------:|:-------:|:-----:|
-|<img width=200/> Resnet50-ibn    | `--circle`, `--contrast` |                                           | **73.1**  | **91.0**  | **94.8**   | **77.1** |
-| Resnet50-ibn    | `--contrast`             |                                           | 72.3  | 89.6  | 93.0   | 76.2 |
-| Resnet50-ibn    | `--circle`               |                                           | 72.1  | 90.7  | 94.3   | 76.2 |
-| Resnet50-ibn    | `--triplet`              |                                           | 71.9  | 89.2  | 93.0   | 75.9 |
-| Resnet50-ibn    | `--instance`             |                                           | 68.6  | 86.8  | 90.8   | 72.7 |
-| Resnet50-ibn    | `--arcface`              |                                           | 68.3  | 87.3  | 91.0   | 72.5 |
-| Resnet50-ibn    | `--sphere`               |                                           | 68.0  | 86.6  | 90.5   | 72.1 |
-| Resnet50-ibn    |                          |                                           | 68.4  | 86.8  | 90.4   | 72.5 |
-| Resnet50-ibn    |                          | `--samples_per_class=1`                   | 67.3  | 86.7  | 91.2   | 71.7 |
-| Resnet50-ibn    |                          | `--batchsize=64`                          | 64.5  | 84.5  | 89.9   | 69.1 |
-| Resnet50-ibn    |                          | `--batchsize=64`, `--samples_per_class=6` | 64.6  | 83.9  | 88.3   | 69.0 |
-| Resnet50-ibn    |                          | `--label_smoothing=0.05`                  | 68.5  | 86.4  | 90.3   | 72.5 |
-| Resnet50-ibn    |                          | `--fp16`                                  | 68.6  | 86.5  | 90.7   | 72.6 |
-| Resnet50        |                          |                                           | 64.6  | 84.8  | 89.6   | 69.2 |
-| Efficientnet-b0 |                          |                                           | 63.7  | 83.3  | 88.1   | 68.2 |
+| model                         | metric losses            | other params                              | Rank@1   | Rank@5   | Rank@10  | mAP      |
+|:-----------------------------:|:------------------------:|:-----------------------------------------:|:--------:|:--------:|:--------:|:--------:|
+| <img width=200/> Resnet50-ibn | `--circle`, `--contrast` |                                           | **73.1** | **91.0** | **94.8** | **77.1** |
+| Resnet50-ibn                  | `--contrast`             |                                           | 72.3     | 89.6     | 93.0     | 76.2     |
+| Resnet50-ibn                  | `--circle`               |                                           | 72.1     | 90.7     | 94.3     | 76.2     |
+| Resnet50-ibn                  | `--triplet`              |                                           | 71.9     | 89.2     | 93.0     | 75.9     |
+| Resnet50-ibn                  | `--cosface`              |                                           | 69.1     | 86.7     | 90.7     | 73.1     |
+| Resnet50-ibn                  | `--instance`             |                                           | 68.6     | 86.8     | 90.8     | 72.7     |
+| Resnet50-ibn                  | `--arcface`              |                                           | 68.3     | 87.3     | 91.0     | 72.5     |
+| Resnet50-ibn                  | `--sphere`               |                                           | 68.0     | 86.6     | 90.5     | 72.1     |
+| Resnet50-ibn                  |                          |                                           | 68.4     | 86.8     | 90.4     | 72.5     |
+| Resnet50-ibn                  |                          | `--samples_per_class=1`                   | 67.3     | 86.7     | 91.2     | 71.7     |
+| Resnet50-ibn                  |                          | `--batchsize=64`                          | 64.5     | 84.5     | 89.9     | 69.1     |
+| Resnet50-ibn                  |                          | `--batchsize=64`, `--samples_per_class=6` | 64.6     | 83.9     | 88.3     | 69.0     |
+| Resnet50-ibn                  |                          | `--label_smoothing=0.05`                  | 68.5     | 86.4     | 90.3     | 72.5     |
+| Resnet50-ibn                  |                          | `--fp16`                                  | 68.6     | 86.5     | 90.7     | 72.6     |
+| Resnet50                      |                          |                                           | 64.6     | 84.8     | 89.6     | 69.2     |
+| Efficientnet-b0               |                          |                                           | 63.7     | 83.3     | 88.1     | 68.2     |
+| HRNet                         |                          |                                           | 70.4     | 87.8     | 91.3     | 74.2     |
+| DenseNet121                   |                          |                                           | 65.8     | 85.6     | 90.4     | 70.2     |
 
 
 ### Zala test

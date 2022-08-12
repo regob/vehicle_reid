@@ -13,7 +13,7 @@ import torch.optim as optim
 import torch.cuda.amp as amp
 from torch.optim import lr_scheduler
 import torchvision
-from torchvision import datasets, transforms
+from torchvision import transforms
 import torch.backends.cudnn as cudnn
 
 import matplotlib
@@ -31,7 +31,7 @@ try:
     import torch_xla.distributed.xla_multiprocessing as xmp
     import torch_xla.distributed.parallel_loader as pl
 except ImportError:
-    print("WARNING: torch_xla not installed, TPU training and the --tpu_cores argument wont work")
+    warnings.warn("torch_xla not installed, TPU training and the --tpu_cores argument wont work")
 
 version = list(map(int, torch.__version__.split(".")[:2]))
 torchvision_version = list(map(int, torchvision.__version__.split(".")[:2]))
@@ -154,8 +154,8 @@ else:
                 gpu_ids.append(gid)
 
     use_tpu = False
-    use_gpu = torch.cuda.is_available()
-    if not use_gpu or len(gpu_ids) == 0:
+    use_gpu = torch.cuda.is_available() and len(gpu_ids) > 0
+    if not use_gpu:
         print("Running on CPU ...")
     else:
         print("Running on cuda:{}".format(gpu_ids[0]))
@@ -351,13 +351,14 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
             "val": torch.utils.data.DataLoader(image_datasets["val"],
                                                batch_size=opt.batchsize,
                                                num_workers=num_workers,
-                                               pin_memory=True),
+                                               pin_memory=use_gpu),
             
             "train": torch.utils.data.DataLoader(image_datasets["train"],
                                                  batch_sampler=train_sampler,
                                                  num_workers=num_workers,
-                                                 pin_memory=True)
+                                                 pin_memory=use_gpu)
         }
+
 
     for epoch in range(start_epoch, num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
