@@ -103,7 +103,6 @@ class ft_net(nn.Module):
 
 # Define the swin_base_patch4_window7_224 Model
 class ft_net_swin(nn.Module):
-
     def __init__(self, class_num, droprate=0.5, circle=False, linear_num=512, **kwargs):
         super(ft_net_swin, self).__init__()
         model_ft = timm.create_model(
@@ -111,11 +110,14 @@ class ft_net_swin(nn.Module):
         model_ft.head = nn.Sequential()
         self.model = model_ft
         self.circle = circle
+        self.avgpool = nn.AdaptiveAvgPool1d(1)
         self.classifier = ClassBlock(
             1024, class_num, droprate, linear=linear_num, return_f=circle)
 
     def forward(self, x):
-        x = self.model(x)
+        x = self.model.forward_features(x)
+        x = self.avgpool(x.permute(0, 2, 1))
+        x = x.squeeze(2)
         x = self.classifier(x)
         return x
 
