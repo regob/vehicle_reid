@@ -44,6 +44,8 @@ parser.add_argument('--gpu_ids', default='0', type=str,
 parser.add_argument('--batchsize', default=32, type=int, help='batchsize')
 parser.add_argument('--ms', default='1', type=str,
                     help='multiple_scale: e.g. 1 1,1.1  1,1.1,1.2')
+parser.add_argument("--eval_gpu", action="store_true",
+                    help="Run evaluation on gpu too. This may need a high amount of GPU memory.")
 opt = parser.parse_args()
 
 
@@ -183,4 +185,8 @@ result = {'gallery_f': gallery_feature.numpy(), 'gallery_label': gallery_labels,
 scipy.io.savemat('pytorch_result.mat', result)
 
 print("Feature extraction finished, starting evaluation ...")
-os.system('python3 evaluate.py')
+torch.cuda.empty_cache()
+if opt.eval_gpu:
+    os.system('python3 evaluate.py --gpu')
+else:
+    os.system('python3 evaluate.py')
