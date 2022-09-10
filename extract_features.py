@@ -7,14 +7,11 @@ import os
 import sys
 
 import torch
-import torch.nn as nn
-from torch.autograd import Variable
 import torch.backends.cudnn as cudnn
 import torchvision
 from torchvision import transforms
 import scipy.io
 import pandas as pd
-import tqdm
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(SCRIPT_DIR)
@@ -34,19 +31,17 @@ parser.add_argument("--model_opts", required=True,
                     type=str, help="model saved options")
 parser.add_argument("--checkpoint", required=True,
                     type=str, help="model checkpoint to load")
-parser.add_argument("--query_csv_path", required=True,
-                    type=str, help="csv to contain query image data")
-parser.add_argument("--gallery_csv_path", required=True,
-                    type=str, help="csv to contain gallery image data")
+parser.add_argument("--csv_path", required=True,
+                    type=str, help="csv to contain metadata for the images")
 parser.add_argument("--data_dir", type=str, required=True,
                     help="root directory for image datasets")
+parser.add_argument("--output_path", default="pytorch_result.mat",
+                    help="file to write output features into.")
 parser.add_argument('--gpu_ids', default='0', type=str,
                     help='gpu_ids: e.g. 0  0,1,2  0,2')
 parser.add_argument('--batchsize', default=32, type=int, help='batchsize')
 parser.add_argument('--ms', default='1', type=str,
                     help='multiple_scale: e.g. 1 1,1.1  1,1.1,1.2')
-parser.add_argument("--eval_gpu", action="store_true",
-                    help="Run evaluation on gpu too. This may need a high amount of GPU memory.")
 opt = parser.parse_args()
 
 
@@ -90,24 +85,20 @@ data_transforms = transforms.Compose([
 ])
 
 
-query_df = pd.read_csv(opt.query_csv_path)
-gallery_df = pd.read_csv(opt.gallery_csv_path)
-classes = list(pd.concat([query_df["id"], gallery_df["id"]]).unique())
+df = pd.read_csv(opt.csv_path)
+classes = list(df["id"].unique())
 
-image_datasets = {
-    "query": ImageDataset(opt.data_dir, query_df, "id", classes, transform=data_transforms),
-    "gallery": ImageDataset(opt.data_dir, gallery_df, "id", classes, transform=data_transforms)
-}
+image_dataset = ImageDataset(opt.data_dir, df, "id", classes, transform=data_transforms)
+dataloader = torch.utils.data.DataLoader(image_dataset, batch_size=opt.batchsize,
+                                         shuffle=False, num_workers=2)
 
-dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=opt.batchsize,
-                                              shuffle=False, num_workers=2) for x in ['gallery', 'query']}
 
 
 ######################################################################
 # Load model
 # ----------
 
-print('-------test-----------')
+print('------- Feature extraction -----------')
 print("Running on: {}".format(device))
 
 model = load_model_from_opts(opt.model_opts, ckpt=opt.checkpoint,
@@ -115,26 +106,16 @@ model = load_model_from_opts(opt.model_opts, ckpt=opt.checkpoint,
 model.eval()
 model.to(device)
 
-# Extract feature
+# Extract features
 since = time.time()
 with torch.no_grad():
-    query_feature, query_labels = extract_feature(
-        model, dataloaders['query'], device, ms)
-    gallery_feature, gallery_labels = extract_feature(
-        model, dataloaders['gallery'], device, ms)
+    features, labels = extract_feature(model, dataloader, device, ms)
 
 time_elapsed = time.time() - since
 print('Complete in {:.0f}m {:.2f}s'.format(
     time_elapsed // 60, time_elapsed % 60))
 
-# Save to Matlab for check
-result = {'gallery_f': gallery_feature.numpy(), 'gallery_label': gallery_labels,
-          'query_f': query_feature.numpy(), 'query_label': query_labels}
-scipy.io.savemat('pytorch_result.mat', result)
+result = {'features': features.numpy(), 'labels': labels}
+scipy.io.savemat(opt.output_path, result)
 
-print("Feature extraction finished, starting evaluation ...")
-torch.cuda.empty_cache()
-if opt.eval_gpu:
-    os.system('python3 evaluate.py --gpu')
-else:
-    os.system('python3 evaluate.py')
+print("Feature extraction finished.")
