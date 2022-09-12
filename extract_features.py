@@ -108,8 +108,7 @@ model.to(device)
 
 # Extract features
 since = time.time()
-with torch.no_grad():
-    features, labels = extract_feature(model, dataloader, device, ms)
+features, labels = extract_feature(model, dataloader, device, ms)
 
 time_elapsed = time.time() - since
 print('Complete in {:.0f}m {:.2f}s'.format(

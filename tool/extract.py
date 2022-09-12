@@ -10,7 +10,6 @@ def fliplr(img):
 
 
 def extract_feature(model, dataloader, device="cuda:0", ms=[1]):
-    img_count = 0
     dummy = next(iter(dataloader))[0].to(device)
     output = model(dummy)
     feature_dim = output.shape[1]
@@ -20,7 +19,6 @@ def extract_feature(model, dataloader, device="cuda:0", ms=[1]):
     for idx, data in enumerate(tqdm.tqdm(dataloader)):
         X, y = data
         n, c, h, w = X.size()
-        img_count += n
         ff = torch.FloatTensor(n, feature_dim).zero_().to(device)
 
         for lab in y:
@@ -34,7 +32,8 @@ def extract_feature(model, dataloader, device="cuda:0", ms=[1]):
                 if scale != 1:
                     input_X = torch.nn.functional.interpolate(
                         input_X, scale_factor=scale, mode='bicubic', align_corners=False)
-                outputs = model(input_X)
+                with torch.no_grad():
+                    outputs = model(input_X)
                 ff += outputs
 
         fnorm = torch.norm(ff, p=2, dim=1, keepdim=True)
