@@ -118,7 +118,7 @@ def load_model_from_opts(opts_file, ckpt=None, return_feature=False, remove_clas
 
     if model_type in ("resnet", "resnet_ibn"):
         model = create_model(n_classes, "resnet", droprate=droprate, ibn=(model_type == "resnet_ibn"),
-                             stride=stride, circle=return_feature, linear_num=linear_num)
+                             stride=stride, circle=return_feature, linear_num=linear_num, model_subtype=model_subtype)
     elif model_type == "densenet":
         model = create_model(n_classes, "densenet", droprate=droprate, circle=return_feature,
                              linear_num=linear_num)

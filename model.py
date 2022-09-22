@@ -69,13 +69,22 @@ class ClassBlock(nn.Module):
 # Define the ResNet50-based Model
 class ft_net(nn.Module):
 
-    def __init__(self, class_num=751, droprate=0.5, stride=2, circle=False, ibn=False, linear_num=512):
+    def __init__(self, class_num=751, droprate=0.5, stride=2, circle=False, ibn=False, linear_num=512, model_subtype="50"):
         super(ft_net, self).__init__()
-        if ibn:
-            model_ft = torch.hub.load(
-                'XingangPan/IBN-Net', 'resnet50_ibn_a', pretrained=True)
+        if model_subtype in ("50", "default"):
+            if ibn:
+                model_ft = torch.hub.load(
+                    'XingangPan/IBN-Net', 'resnet50_ibn_a', pretrained=True)
+            else:
+                model_ft = models.resnet50(weights="IMAGENET1K_V2")
+        elif model_subtype == "101":
+            if ibn:
+                model_ft = torch.hub.load("XingangPan/IBN-Net", "resnet101_ibn_a", pretrained=True)
+            else:
+                model_ft = models.resnet101(weights="IMAGENET1K_V2")
         else:
-            model_ft = models.resnet50(weights="IMAGENET1K_V2")
+            raise ValueError(f"Resnet model subtype: {model_subtype} is invalid, choose from: ['50', '101'].")
+        
         # avg pooling to global pooling
         if stride == 1:
             model_ft.layer4[0].downsample[0].stride = (1, 1)
