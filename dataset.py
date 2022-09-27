@@ -59,7 +59,7 @@ class BatchSampler:
         ids = self.dataset.df[self.dataset.target_label]
         ids = ids.sample(frac=1.0)
         samples_for_id = {}
-        for idx, cls in ids.iteritems():
+        for idx, cls in ids.items():
             samples_for_id.setdefault(cls, []).append(idx)
 
         # create patches of size: samples_per_class
