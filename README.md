@@ -15,15 +15,28 @@ required annotation files are created.
 for training, evaluating, and using a model.**
 
 ## Installation
-Tested on python3.8, but other versions work too (possibly >=3.6).
+Tested on python3.7 to 3.10, but probably other versions work too.
 Clone the repo, then create a virtual environment:
 ```
 $ python3 -m venv .venv
 $ source .venv/bin/activate
 ```
-And install the requirements (mostly torch and other utility packages):
+And install the requirements (mostly torch and other utility packages ~2.0GB
+in total):
 ```
 $ pip3 install -r requirements.txt
+```
+
+A complete install is not always necessary with the exact versions in the
+`requirements.txt`, the following versions also seem to work:
+```
+torch>=1.7.0
+pytorch_metric_learning>=1.2.0
+numpy>=1.13.0
+pandas>=1.2.2
+torchvision>=0.8.0
+timm>=0.6.7
+pretrainedmodels>=0.7.4
 ```
 
 ## Data preparation
