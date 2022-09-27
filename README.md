@@ -1,24 +1,21 @@
-<h1 align="center"> Vehicle ReID </h1>
-<h2 align="center"> Strong, Small, (Un)friendly </h2>
+<h1 align="center"> Object/Vehicle Re-identification </h1>
 
 [![Language grade: Python](https://img.shields.io/lgtm/grade/python/github/regob/vehicle_reid)](https://lgtm.com/projects/g/regob/vehicle_reid/context:python)
 [![Total
 alerts](https://img.shields.io/lgtm/alerts/github/regob/vehicle_reid?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/regob/vehicle_reid/)
-[![Total LOC](https://img.shields.io/tokei/lines/github/regob/vehicle_reid)](https://img.shields.io/tokei/lines/github/regob/vehicle_reid?style=flat-square)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-
-Baseline code for vehicle re-identification. Based on [layumi's person re-id
+Baseline code for object re-identification. Based on [layumi's person re-id
 repo](https://github.com/layumi/Person_reID_baseline_pytorch).
-The code is general, and works for any re-id task or dataset (not just vehicles) if the
+The code is general (although tested on vehicles), and works for any re-id task or dataset if the
 required annotation files are created.
 
-**A vehicle re-id tutorial is available now in a
+**A vehicle re-id tutorial is available in a
 [Kaggle notebook](https://www.kaggle.com/code/sosperec/vehicle-reid-tutorial/)
 for training, evaluating, and using a model.**
 
 ## Installation
-Tested on python3.8, but other versions could work too.
+Tested on python3.8, but other versions work too (possibly >=3.6).
 Clone the repo, then create a virtual environment:
 ```
 $ python3 -m venv .venv
@@ -29,38 +26,26 @@ And install the requirements (mostly torch and other utility packages):
 $ pip3 install -r requirements.txt
 ```
 
-## Datasets
+## Data preparation
 
-| name | images | identities |
-| :--- | :---: | :---: |
-| VRIC | 60K | 5622 |
-| Cityflow (v2) | 313K | 880 |
-| VeRi-776 | 50K | 776 |
-| VeRi-Wild | 416K | 40K |
-| VehicleID | 221K | 26K |
-| PKU-VD1 | 846K | 141K |
-| PKU-VD2 | 807K | 79K |
-| VehicleX | ∞ | ∞ (~170 models) |
-
-
-For training a re-id model the dataset has to be prepared. The images can be stored in any structure, but a csv file is needed for the train and validation subsets. The csv files contain a row per image and have mandatory `path` and `id` columns (and possible other columns). E.g (brand, type, and color attributes are not available for CityFlow):
+For training a re-id model the dataset has to be prepared. The images can be stored in any structure, but a csv file is needed for the train and validation subsets. The csv files contain a row per image and have mandatory `path` and `id` columns (and possible other columns, that are ignored).
 ```
-$ head id_split_cityflow_train.csv 
-path,brand,type,color,id,subset
-cityflow2_reid/image_train/006561.jpg,,,,54642,cityflow_train
-cityflow2_reid/image_train/048961.jpg,,,,54520,cityflow_train
-cityflow2_reid/image_train/017624.jpg,,,,54669,cityflow_train
+$ head train_annot.csv 
+path,id
+cityflow2_reid/image_train/006561.jpg,54642
+cityflow2_reid/image_train/048961.jpg,54520
+cityflow2_reid/image_train/017624.jpg,54669
 ```
 The paths are relative to the **dataset root folder**, which is passed to the
 scripts. An example directory structure could look like this:
 ```
 |── datasets/
 |    |── annot/
-|        |── id_split_train.csv
-|        |── id_split_val.csv
+|        |── train_annot.csv
+|        |── val_annot.csv
 |    |── VeRi-Wild/
 |        |── images/ 
-│    ├── CityFlow/
+│    ├── cityflow2_reid/
 |    |── VehicleX/ 
 ```
 
@@ -75,7 +60,7 @@ The `train.py` script can be used to train a model, and saves it into a subdirec
 Other very important parameters:
 - `--batchsize`: Batch size during training, should be reasonable (like 32, 64).
 - `--model`: By default a Resnet50-ibn is trained. All options are: ['resnet', 'resnet_ibn', densenet', 'swin',
-                    'NAS', 'hr', 'efficientnet']
+                    'hr', 'efficientnet']
 - `--total_epoch`: Number of epochs - around 15 to 20 is needed at a minimum depending on the size of the dataset (with ~400 000 images I got decent results even after 10)
 - `--warm_epoch`: Number of warmup epochs (increase learning rate gradually)
 - `--save_freq`: Sets the frequency of saving a model in epochs (1: saving after each one, 2: after every second, etc), but the model is saved at the very end regardless.
@@ -158,6 +143,18 @@ a different id than the query.
 
 ![Cityflow sample query.](assets/cityflow_sample_query.png)
 
+## Datasets
+
+| name | images | identities |
+| :--- | :---: | :---: |
+| VRIC | 60K | 5622 |
+| Cityflow (v2) | 313K | 880 |
+| VeRi-776 | 50K | 776 |
+| VeRi-Wild | 416K | 40K |
+| VehicleID | 221K | 26K |
+| PKU-VD1 | 846K | 141K |
+| PKU-VD2 | 807K | 79K |
+| VehicleX | ∞ | ∞ (~170 models) |
 
 ## Results
 ### Cityflow 
