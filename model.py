@@ -4,6 +4,7 @@ from torch.nn import init
 from torchvision import models
 from torch.autograd import Variable
 import timm
+from tool import mixstyle
 
 ######################################################################
 
@@ -94,6 +95,7 @@ class ft_net(nn.Module):
         self.circle = circle
         self.classifier = ClassBlock(
             2048, class_num, droprate, linear=linear_num, return_f=circle)
+        self.mixstyle = mixstyle.MixStyle(alpha=0.3)
 
     def forward(self, x):
         x = self.model.conv1(x)
@@ -101,7 +103,11 @@ class ft_net(nn.Module):
         x = self.model.relu(x)
         x = self.model.maxpool(x)
         x = self.model.layer1(x)
+        if self.training:
+            x = self.mixstyle(x)
         x = self.model.layer2(x)
+        if self.training:
+            x = self.mixstyle(x)
         x = self.model.layer3(x)
         x = self.model.layer4(x)
         x = self.model.avgpool(x)
