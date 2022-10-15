@@ -113,12 +113,14 @@ def load_model_from_opts(opts_file, ckpt=None, return_feature=False, remove_clas
     stride = opts["stride"]
     linear_num = opts["linear_num"]
     
-    model_subtype = "default" if "model_subtype" not in opts else opts["model_subtype"]
-    model_type = "resnet_ibn" if "model" not in opts else opts["model"]
+    model_subtype = opts.get("model_subtype", "default")
+    model_type = opts.get("model", "resnet_ibn")
+    mixstyle = opts.get("mixstyle", False)
 
     if model_type in ("resnet", "resnet_ibn"):
         model = create_model(n_classes, "resnet", droprate=droprate, ibn=(model_type == "resnet_ibn"),
-                             stride=stride, circle=return_feature, linear_num=linear_num, model_subtype=model_subtype)
+                             stride=stride, circle=return_feature, linear_num=linear_num,
+                             model_subtype=model_subtype, mixstyle=mixstyle)
     elif model_type == "densenet":
         model = create_model(n_classes, "densenet", droprate=droprate, circle=return_feature,
                              linear_num=linear_num)

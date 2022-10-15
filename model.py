@@ -70,7 +70,8 @@ class ClassBlock(nn.Module):
 # Define the ResNet50-based Model
 class ft_net(nn.Module):
 
-    def __init__(self, class_num=751, droprate=0.5, stride=2, circle=False, ibn=False, linear_num=512, model_subtype="50"):
+    def __init__(self, class_num=751, droprate=0.5, stride=2, circle=False, ibn=False, linear_num=512,
+                 model_subtype="50", mixstyle=True):
         super(ft_net, self).__init__()
         if model_subtype in ("50", "default"):
             if ibn:
@@ -95,7 +96,7 @@ class ft_net(nn.Module):
         self.circle = circle
         self.classifier = ClassBlock(
             2048, class_num, droprate, linear=linear_num, return_f=circle)
-        self.mixstyle = mixstyle.MixStyle(alpha=0.3)
+        self.mixstyle = mixstyle.MixStyle(alpha=0.3) if mixstyle else None
 
     def forward(self, x):
         x = self.model.conv1(x)
@@ -103,10 +104,10 @@ class ft_net(nn.Module):
         x = self.model.relu(x)
         x = self.model.maxpool(x)
         x = self.model.layer1(x)
-        if self.training:
+        if self.training and self.mixstyle:
             x = self.mixstyle(x)
         x = self.model.layer2(x)
-        if self.training:
+        if self.training and self.mixstyle:
             x = self.mixstyle(x)
         x = self.model.layer3(x)
         x = self.model.layer4(x)

@@ -102,6 +102,8 @@ parser.add_argument("--model", default="resnet_ibn",
                     'NAS', 'hr', 'efficientnet'] (default: resnet_ibn)""")
 parser.add_argument("--model_subtype", default="default",
                     help="Subtype for the model (b0 to b7 for efficientnet)")
+parser.add_argument("--mixstyle", action="store_true",
+                    help="Use MixStyle in training for domain generalization (only for resnet variants yet)")
 
 parser.add_argument('--arcface', action='store_true',
                     help='use ArcFace loss')
