@@ -74,10 +74,11 @@ Other very important parameters:
 - `--batchsize`: Batch size during training, should be reasonable (like 32, 64).
 - `--model`: By default a Resnet50-ibn is trained. All options are: ['resnet', 'resnet_ibn', densenet', 'swin',
                     'hr', 'efficientnet']
+- `--model_subtype`: Type of model (e.g "50" or "101" for resnet, and "b0"-"b7" for efficientnet).
 - `--total_epoch`: Number of epochs - around 15 to 20 is needed at a minimum depending on the size of the dataset (with ~400 000 images I got decent results even after 10)
 - `--warm_epoch`: Number of warmup epochs (increase learning rate gradually)
 - `--save_freq`: Sets the frequency of saving a model in epochs (1: saving after each one, 2: after every second, etc), but the model is saved at the very end regardless.
-- `--lr`: Learning rate.
+- `--lr`: Base learning rate.
 - `--fp16`: Use Mixed precision training (convert to float16 automatically in
   forward pass)
 - `--triplet`, `--contrast`, `--sphere`, `--circle`: Loss functions.
@@ -170,16 +171,6 @@ a different id than the query.
 | VehicleX | ∞ | ∞ (~170 models) |
 
 ## Results
-### Cityflow 
-The test data is created here from 200 ids from the cityflow labeled train data.
-Models are trained on VeRi-Wild, VehicleX-SPGAN, and Zala datasets. So this is
-a **cross-domain** experiment, no Cityflow data was used in training.
-
-| model | train data | Rank@1 | mAP | 
-|---|---|:---:|:---:|
-| Resnet50-ibn + contrastive | VeRi-Wild | 99.8| 35.9 | 
-| Resnet50-ibn + contrastive | VeRi-Wild + Zala | 99.5 | 40.8 |
-| Resnet50-ibn + contrastive | VeRi-Wild + Zala + VehicleX | 99.8 |43.7 |
 
 ### VRIC
 
@@ -213,16 +204,6 @@ differ from this):
 | DenseNet121                   |                          |                                           | 65.8     | 85.6     | 90.4     | 70.2     |
 
 
-### Zala test
-Private test data with 100 ids.
-
-| model | train data | Rank@1 | mAP | 
-|---|---|:---:|:---:|
-| Resnet50-ibn + contrastive | VeRi-Wild | 98.0| 70.6 |
-| Resnet50-ibn + contrastive | VeRi-Wild + Zala | 99.4 | 90.4 |
-| Resnet50-ibn + contrastive | VeRi-Wild + Zala + VehicleX |99.4 |90.32 |
-
-
 ## Citation
 The following paper uses and reports the result of the original baseline model
 (for person re-id). You may cite it in your paper.
@@ -234,5 +215,3 @@ The following paper uses and reports the result of the original baseline model
   year={2019}
 }
 ```
-
-
