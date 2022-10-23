@@ -4,7 +4,7 @@ from torch.nn import init
 from torchvision import models
 from torch.autograd import Variable
 import timm
-from tool import mixstyle
+from tool.mixstyle import MixStyle
 
 ######################################################################
 
@@ -96,7 +96,7 @@ class ft_net(nn.Module):
         self.circle = circle
         self.classifier = ClassBlock(
             2048, class_num, droprate, linear=linear_num, return_f=circle)
-        self.mixstyle = mixstyle.MixStyle(alpha=0.3) if mixstyle else None
+        self.mixstyle = MixStyle(alpha=0.3) if mixstyle else None
 
     def forward(self, x):
         x = self.model.conv1(x)

@@ -78,7 +78,7 @@ parser.add_argument("--grad_clip_max_norm", type=float, default=5.0,
                     help="maximum norm of gradient to be clipped to")
 
 parser.add_argument('--lr', default=0.05,
-                    type=float, help='learning rate')
+                    type=float, help='base learning rate for the head. 0.1 * lr is used for the backbone')
 parser.add_argument('--cosine', action='store_true',
                     help='use cosine learning rate')
 parser.add_argument('--batchsize', default=32,
