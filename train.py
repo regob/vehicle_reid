@@ -61,11 +61,12 @@ parser.add_argument('--gpu_ids', default='0', type=str,
                     help='gpu_ids: e.g. 0  0,1,2  0,2')
 parser.add_argument('--tpu_cores', default=-1, type=int,
                     help="use TPU instead of GPU with the given number of cores (1 recommended if not too many cpus)")
+parser.add_argument('--num_workers', default=2, type=int)
 parser.add_argument('--warm_epoch', default=0, type=int,
                     help='the first K epoch that needs warm up (counted from start_epoch)')
 parser.add_argument('--total_epoch', default=60,
                     type=int, help='total training epoch')
-parser.add_argument("--save_freq", default=1, type=int,
+parser.add_argument("--save_freq", default=5, type=int,
                     help="frequency of saving the model in epochs")
 parser.add_argument("--checkpoint", default="", type=str,
                     help="Model checkpoint to load.")
@@ -74,7 +75,7 @@ parser.add_argument("--start_epoch", default=0, type=int,
 
 parser.add_argument('--fp16', action='store_true',
                     help='Use mixed precision training. This will occupy less memory in the forward pass, and will speed up training in some architectures (Nvidia A100, V100, etc.)')
-parser.add_argument("--grad_clip_max_norm", type=float, default=5.0,
+parser.add_argument("--grad_clip_max_norm", type=float, default=50.0,
                     help="maximum norm of gradient to be clipped to")
 
 parser.add_argument('--lr', default=0.05,
@@ -591,4 +592,6 @@ else:
         criterion = torch.nn.CrossEntropyLoss()
 
     model = train_model(
-        model, criterion, start_epoch=opt.start_epoch, num_epochs=opt.total_epoch)
+        model, criterion, start_epoch=opt.start_epoch, num_epochs=opt.total_epoch,
+        num_workers=opt.num_workers
+    )
