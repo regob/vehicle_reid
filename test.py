@@ -14,6 +14,7 @@ import torchvision
 from torchvision import transforms
 import scipy.io
 import pandas as pd
+import numpy as np
 import tqdm
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

@@ -85,10 +85,9 @@ query_feature = torch.FloatTensor(result['query_f'])
 query_label = result['query_label'][0]
 gallery_feature = torch.FloatTensor(result['gallery_f'])
 gallery_label = result['gallery_label'][0]
-query_cam = result['query_cam']
-gallery_cam = result['gallery_cam']
-query_cam = query_cam.reshape(-1) if not args.no_cams and query_cam is not None else None
-gallery_cam = gallery_cam.reshape(-1) if not args.no_cams and gallery_cam is not None else None
+query_cam = result['query_cam'].reshape(-1)
+gallery_cam = result['gallery_cam'].reshape(-1)
+use_cam = (len(gallery_cam) > 0 and len(query_cam) > 0) and not args.no_cams
 
 query_feature = query_feature.to(device)
 gallery_feature = gallery_feature.to(device)
@@ -98,10 +97,11 @@ CMC = torch.IntTensor(K).zero_()
 ap = 0.0
 
 for i in range(len(query_label)):
-    qc = query_cam[i] if query_cam is not None else None
+    qc = query_cam[i] if use_cam else None
+    gc = gallery_cam if use_cam else None
     ap_tmp, CMC_tmp = evaluate(
         query_feature[i], query_label[i], gallery_feature, gallery_label,
-        qc, gallery_cam, K
+        qc, gc, K
     )
     if CMC_tmp[0] == -1:
         continue
