@@ -102,8 +102,8 @@ image_datasets = {
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=opt.batchsize,
                                               shuffle=False, num_workers=2) for x in ['gallery', 'query']}
 
-query_cam = query_df["cam"].to_numpy() if "cam" in query_df else None
-gallery_cam = gallery_df["cam"].to_numpy() if "cam" in gallery_df else None
+query_cam = query_df["cam"].to_numpy() if "cam" in query_df else np.array([])
+gallery_cam = gallery_df["cam"].to_numpy() if "cam" in gallery_df else np.array([])
 
 ######################################################################
 # Load model
