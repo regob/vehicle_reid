@@ -102,6 +102,8 @@ image_datasets = {
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=opt.batchsize,
                                               shuffle=False, num_workers=2) for x in ['gallery', 'query']}
 
+query_cam = query_df["cam"].to_numpy() if "cam" in query_df else None
+gallery_cam = gallery_df["cam"].to_numpy() if "cam" in gallery_df else None
 
 ######################################################################
 # Load model
@@ -129,12 +131,25 @@ print('Complete in {:.0f}m {:.2f}s'.format(
 
 # Save to Matlab for check
 result = {'gallery_f': gallery_feature.numpy(), 'gallery_label': gallery_labels,
-          'query_f': query_feature.numpy(), 'query_label': query_labels}
+          'query_f': query_feature.numpy(), 'query_label': query_labels,
+          'gallery_cam': gallery_cam, 'query_cam': query_cam}
 scipy.io.savemat('pytorch_result.mat', result)
 
 print("Feature extraction finished, starting evaluation ...")
 torch.cuda.empty_cache()
+
+# run evaluation script
+cmd = "evaluate.py"
 if opt.eval_gpu:
-    os.system('python3 evaluate.py --gpu')
-else:
-    os.system('python3 evaluate.py')
+    cmd += " --gpu"
+pythons = ["python3", f"python3.{sys.version_info.minor}", "python"]
+for python in pythons:
+    res = os.system(f"{python} --version")
+    if res != 0:
+        continue
+    res = os.system(f"{python} {cmd}")
+    if res == 0:
+        sys.exit(0)
+    else:
+        break
+print(f"Evaluation unsuccessful, run evaluate.py manually")
