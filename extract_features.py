@@ -42,6 +42,7 @@ parser.add_argument('--gpu_ids', default='0', type=str,
 parser.add_argument('--batchsize', default=32, type=int, help='batchsize')
 parser.add_argument('--ms', default='1', type=str,
                     help='multiple_scale: e.g. 1 1,1.1  1,1.1,1.2')
+parser.add_argument('--num_workers', default=0, type=int)
 opt = parser.parse_args()
 
 
@@ -90,7 +91,7 @@ classes = list(df["id"].unique())
 
 image_dataset = ImageDataset(opt.data_dir, df, "id", classes, transform=data_transforms)
 dataloader = torch.utils.data.DataLoader(image_dataset, batch_size=opt.batchsize,
-                                         shuffle=False, num_workers=2)
+                                         shuffle=False, num_workers=opt.num_workers)
 
 
 

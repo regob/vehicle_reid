@@ -48,6 +48,7 @@ parser.add_argument('--ms', default='1', type=str,
                     help='multiple_scale: e.g. 1 1,1.1  1,1.1,1.2')
 parser.add_argument("--eval_gpu", action="store_true",
                     help="Run evaluation on gpu too. This may need a high amount of GPU memory.")
+parser.add_argument("--num_workers", default=0, type=int)
 opt = parser.parse_args()
 
 
@@ -101,7 +102,7 @@ image_datasets = {
 }
 
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=opt.batchsize,
-                                              shuffle=False, num_workers=2) for x in ['gallery', 'query']}
+                                              shuffle=False, num_workers=opt.num_workers) for x in ['gallery', 'query']}
 
 query_cam = query_df["cam"].to_numpy() if "cam" in query_df else np.array([])
 gallery_cam = gallery_df["cam"].to_numpy() if "cam" in gallery_df else np.array([])
