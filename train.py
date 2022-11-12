@@ -26,13 +26,6 @@ import tqdm
 
 from pytorch_metric_learning import losses, miners
 
-try:
-    import torch_xla.core.xla_model as xm
-    import torch_xla.distributed.xla_multiprocessing as xmp
-    import torch_xla.distributed.parallel_loader as pl
-except ImportError:
-    warnings.warn("torch_xla not installed, TPU training and the --tpu_cores argument wont work")
-
 version = list(map(int, torch.__version__.split(".")[:2]))
 torchvision_version = list(map(int, torchvision.__version__.split(".")[:2]))
 
@@ -145,6 +138,14 @@ data_dir = opt.data_dir
 name = opt.name
 
 if opt.tpu_cores > 0:
+    try:
+        import torch_xla.core.xla_model as xm
+        import torch_xla.distributed.xla_multiprocessing as xmp
+        import torch_xla.distributed.parallel_loader as pl
+    except ImportError:
+        warnings.error("torch_xla not installed, TPU training and the --tpu_cores argument wont work")
+        sys.exit(1)
+
     use_tpu, use_gpu = True, False
     print("Running on TPU ...")
 else:
