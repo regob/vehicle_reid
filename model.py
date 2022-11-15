@@ -84,8 +84,12 @@ class ft_net(nn.Module):
                 model_ft = torch.hub.load("XingangPan/IBN-Net", "resnet101_ibn_a", pretrained=True)
             else:
                 model_ft = models.resnet101(weights="IMAGENET1K_V2")
+        elif model_subtype == "152":
+            if ibn:
+                raise ValueError("Resnet152 has no IBN variants available.")
+            model_ft = models.resnet152(weights="IMAGENET1K_V2")
         else:
-            raise ValueError(f"Resnet model subtype: {model_subtype} is invalid, choose from: ['50', '101'].")
+            raise ValueError(f"Resnet model subtype: {model_subtype} is invalid, choose from: ['50','101','152'].")
         
         # avg pooling to global pooling
         if stride == 1:
