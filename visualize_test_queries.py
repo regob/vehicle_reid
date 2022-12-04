@@ -66,6 +66,7 @@ data_transforms = transforms.Compose([
 query_df = pd.read_csv(args.query_csv_path)
 gallery_df = pd.read_csv(args.gallery_csv_path)
 classes = list(pd.concat([query_df["id"], gallery_df["id"]]).unique())
+use_cam = "cam" in query_df and "cam" in gallery_df
 
 
 image_datasets = {
@@ -212,6 +213,8 @@ def on_key(event):
         curr_idx = (curr_idx - 1) if curr_idx > 0 else len(queries) - 1
     elif event.key == "right":
         curr_idx = (curr_idx + 1) if curr_idx < len(queries) - 1 else 0
+    elif event.key == "enter":
+        fig.savefig("reid_query_result.pdf", pad_inches=0, bbox_inches='tight')
     else:
         return
     refresh_plot()
@@ -227,22 +230,36 @@ def refresh_plot():
         with torch.no_grad():
             q_feature = extract_feature(model, X).cpu()
 
-    gallery_scores = get_scores(q_feature, gallery_features)
+    if use_cam:
+        curr_cam = query_df["cam"].iloc[curr_idx]
+        good_gallery_idx = torch.tensor(gallery_df["cam"] != curr_cam).type(torch.bool)
+        gallery_orig_idx = np.where(good_gallery_idx)[0]
+        gal_features = gallery_features[good_gallery_idx]
+    else:
+        gallery_orig_idx = np.arange(len(gallery_df))
+        gal_features = gallery_features
+    gallery_scores = get_scores(q_feature, gal_features)
     idx = np.argsort(gallery_scores)[::-1]
-    g_labels = gallery_labels[idx]
+
+    if use_cam:
+        g_labels = gallery_labels[gallery_orig_idx][idx]
+    else:
+        g_labels = gallery_labels[idx]
 
     q_img = dataset.get_image(curr_idx)
-    g_imgs = [image_datasets["gallery"].get_image(i)
+    g_imgs = [image_datasets["gallery"].get_image(gallery_orig_idx[i])
               for i in idx[:args.num_images]]
     show_query_result(axes, q_img, g_imgs, y, g_labels)
     fig.canvas.draw()
     fig.canvas.flush_events()
-    fig.savefig("reid_query_result.pdf", pad_inches=0, bbox_inches='tight')
 
 
 n_rows = math.ceil((1 + args.num_images) / args.imgs_per_row)
 fig, axes = plt.subplots(n_rows, args.imgs_per_row, figsize=(12, 15))
 fig.canvas.mpl_connect('key_press_event', on_key)
+
+HELP_TXT="Press <left-arrow> and <right-arrow> to navigate queries. Press <enter> to save into current folder as pdf."
+print(HELP_TXT)
 
 curr_idx = 0
 refresh_plot()
