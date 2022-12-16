@@ -1,8 +1,5 @@
 <h1 align="center"> Object/Vehicle Re-identification </h1>
 
-[![Language grade: Python](https://img.shields.io/lgtm/grade/python/github/regob/vehicle_reid)](https://lgtm.com/projects/g/regob/vehicle_reid/context:python)
-[![Total
-alerts](https://img.shields.io/lgtm/alerts/github/regob/vehicle_reid?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/regob/vehicle_reid/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 Baseline code for object re-identification. Based on [layumi's person re-id
